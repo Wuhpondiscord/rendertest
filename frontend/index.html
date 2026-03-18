@@ -42,6 +42,7 @@
     }
     #start-overlay h1 { color: var(--accent); margin-bottom: 10px; }
     #start-overlay p { color: #ccc; font-size: 14px; }
+    #error-text { color: #f38ba8; margin-top: 20px; font-family: monospace; }
 
     .transport {
       background: var(--panel);
@@ -126,6 +127,7 @@
 <div id="start-overlay" onclick="initAudio()">
   <h1>Click Anywhere to Start</h1>
   <p>(It may take 50 seconds for the multiplayer server to wake up)</p>
+  <div id="error-text"></div>
 </div>
 
 <div class="transport">
@@ -147,7 +149,7 @@ let currentStep = 0;
 let isPlaying = false;
 let buttons = {};
 
-// Fallback grid so the UI loads instantly even if Render is asleep
+// Fallback grid
 let grid = {
   kick: Array(STEPS).fill(false),
   snare: Array(STEPS).fill(false),
@@ -156,36 +158,66 @@ let grid = {
   bongo: Array(STEPS).fill(false)
 };
 
-// Safe, permanent URLs directly from Tone.js Github
-const kit = new Tone.Players({
-  kick: "https://cdn.jsdelivr.net/gh/Tonejs/Tone.js/examples/audio/drum-samples/CR78/kick.mp3",
-  snare: "https://cdn.jsdelivr.net/gh/Tonejs/Tone.js/examples/audio/drum-samples/CR78/snare.mp3",
-  hihat: "https://cdn.jsdelivr.net/gh/Tonejs/Tone.js/examples/audio/drum-samples/CR78/hihat.mp3",
-  tom: "https://cdn.jsdelivr.net/gh/Tonejs/Tone.js/examples/audio/drum-samples/CR78/tom.mp3",
-  bongo: "https://cdn.jsdelivr.net/gh/Tonejs/Tone.js/examples/audio/drum-samples/CR78/bongo.mp3"
-}).toDestination();
+// --- AUDIO SYNTHESIZERS (NO MP3 FILES NEEDED) ---
+const synths = {
+  kick: new Tone.MembraneSynth().toDestination(),
+  
+  snare: new Tone.NoiseSynth({
+    noise: { type: 'white' },
+    envelope: { attack: 0.005, decay: 0.2, sustain: 0 }
+  }).toDestination(),
+  
+  hihat: new Tone.MetalSynth({
+    frequency: 200,
+    envelope: { attack: 0.001, decay: 0.05, release: 0.01 },
+    harmonicity: 5.1,
+    modulationIndex: 32,
+    resonance: 4000,
+    octaves: 1.5
+  }).toDestination(),
+  
+  tom: new Tone.MembraneSynth({
+    pitchDecay: 0.05,
+    octaves: 4
+  }).toDestination(),
+  
+  bongo: new Tone.MembraneSynth({
+    pitchDecay: 0.01,
+    octaves: 2
+  }).toDestination()
+};
 
-// Build the UI immediately so it's not a blank screen
+// Adjust volumes so they sound balanced
+synths.hihat.volume.value = -10;
+synths.snare.volume.value = -5;
+synths.tom.volume.value = -5;
+synths.bongo.volume.value = -5;
+
+
 buildGrid();
 
+// Audio Unlock 
 async function initAudio() {
   try {
     await Tone.start();
     document.getElementById("start-overlay").style.display = "none";
     Tone.Transport.bpm.value = document.getElementById("bpm").value;
   } catch (err) {
-    console.error("Audio failed to start:", err);
-    alert("Audio failed to load. Try refreshing.");
+    console.error(err);
+    document.getElementById("error-text").innerText = "Error: " + err.message;
   }
 }
 
+// Timing Loop
 Tone.Transport.scheduleRepeat((time) => {
-  Object.keys(grid).forEach(inst => {
-    if (grid[inst][currentStep] && kit.loaded) {
-      kit.player(inst).start(time);
-    }
-  });
+  // Trigger Synths
+  if (grid.kick[currentStep]) synths.kick.triggerAttackRelease("C1", "8n", time);
+  if (grid.snare[currentStep]) synths.snare.triggerAttackRelease("16n", time);
+  if (grid.hihat[currentStep]) synths.hihat.triggerAttackRelease("32n", time);
+  if (grid.tom[currentStep]) synths.tom.triggerAttackRelease("G2", "8n", time);
+  if (grid.bongo[currentStep]) synths.bongo.triggerAttackRelease("C5", "16n", time);
 
+  // Sync UI
   Tone.Draw.schedule(() => {
     updateGridUI(currentStep);
   }, time);
@@ -193,6 +225,7 @@ Tone.Transport.scheduleRepeat((time) => {
   currentStep = (currentStep + 1) % STEPS;
 }, "16n");
 
+// --- UI AND NETWORK LOGIC ---
 function buildGrid() {
   const rack = document.getElementById("rack");
   rack.innerHTML = "";
@@ -216,7 +249,6 @@ function buildGrid() {
       btn.className = `step-btn beat-${Math.floor(i / 4) % 2}`;
 
       btn.onclick = () => {
-        // Optimistic UI update for when offline
         grid[instrument][i] = !grid[instrument][i];
         updateGridUI(-1);
         socket.emit("toggleStep", { instrument, stepIndex: i });
@@ -234,7 +266,7 @@ function buildGrid() {
 
 function updateGridUI(stepPlaying) {
   Object.keys(grid).forEach(instrument => {
-    if(!buttons[instrument]) return; // Safety check
+    if(!buttons[instrument]) return;
     
     grid[instrument].forEach((active, i) => {
       const btn = buttons[instrument][i];
@@ -261,7 +293,6 @@ function togglePlay() {
 
 function clearGrid() {
   socket.emit("clearGrid");
-  // Optimistic offline clear
   Object.keys(grid).forEach(inst => grid[inst] = Array(STEPS).fill(false));
   updateGridUI(-1);
 }
@@ -289,7 +320,7 @@ function applyPlayState(playing) {
   }
 }
 
-// --- SOCKET EVENTS ---
+// SOCKET EVENTS
 socket.on("connect", () => {
   document.getElementById("status").innerText = "🟢 ONLINE";
   document.getElementById("status").style.color = "#a6e3a1";
@@ -320,6 +351,5 @@ socket.on("bpmUpdate", (newBpm) => {
   updateBPM(newBpm);
 });
 </script>
-
 </body>
 </html>
