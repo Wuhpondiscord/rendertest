@@ -1,140 +1,146 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Multiplayer Beat Maker</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Discord Channel Rack</title>
   <script src="https://cdn.jsdelivr.net/npm/tone"></script>
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <style>
+    :root {
+      --bg: #1e1e2e;
+      --panel: #2a2a3e;
+      --text: #cdd6f4;
+      --step-off-1: #45475a;
+      --step-off-2: #585b70;
+      --step-on: #a6e3a1;
+      --step-active: #f9e2af;
+      --accent: #89b4fa;
+    }
+    
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      user-select: none;
+    }
+
+    /* Start Overlay (Required for Browsers/Discord) */
+    #start-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0,0,0,0.9);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      cursor: pointer;
+    }
+    #start-overlay h1 { color: var(--accent); }
+
+    /* Transport Bar (Top) */
+    .transport {
+      background: var(--panel);
+      width: 100%;
+      padding: 15px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      margin-bottom: 30px;
+    }
+
+    button {
+      background: var(--step-off-1);
+      color: var(--text);
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: 0.2s;
+    }
+    button:hover { background: var(--step-off-2); }
+    #playBtn { background: var(--step-on); color: #111; }
+    
+    .bpm-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--bg);
+      padding: 5px 15px;
+      border-radius: 4px;
+    }
+
+    /* Channel Rack */
+    .channel-rack {
+      background: var(--panel);
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .instrument-label {
+      width: 100px;
+      text-transform: capitalize;
+      font-weight: bold;
+      background: var(--bg);
+      padding: 8px;
+      border-radius: 4px;
+      margin-right: 15px;
+      text-align: right;
+      color: var(--accent);
+    }
+
+    .steps { display: flex; gap: 4px; }
+
+    .step-btn {
+      width: 35px;
+      height: 45px;
+      border-radius: 4px;
+      border: 2px solid transparent;
+      padding: 0;
+    }
+
+    /* FL Studio Style Beat Grouping (Groups of 4) */
+    .step-btn.beat-0 { background: var(--step-off-1); }
+    .step-btn.beat-1 { background: var(--step-off-2); }
+
+    /* Active states applied via JS */
+  </style>
 </head>
+<body>
 
-<body style="background:#111;color:white;font-family:sans-serif;text-align:center">
+<div id="start-overlay" onclick="initAudio()">
+  <h1>Click Anywhere to Start</h1>
+</div>
 
-<h2>🎵 Multiplayer Beat Maker</h2>
+<div class="transport">
+  <button id="playBtn" onclick="togglePlay()">PLAY</button>
+  <button onclick="clearGrid()">CLEAR</button>
+  <div class="bpm-container">
+    <input id="bpm" type="range" min="60" max="180" value="120" oninput="updateBPM(this.value)" onchange="sendBPM(this.value)"/>
+    <span id="bpmVal" style="font-family: monospace; font-size: 1.2em;">120 BPM</span>
+  </div>
+</div>
 
-<input id="bpm" type="range" min="60" max="180" value="100"/>
-<span id="bpmVal">100 BPM</span>
-
-<div id="grid" style="margin-top:20px"></div>
+<div class="channel-rack" id="rack"></div>
 
 <script>
-const socket = io("https://beat-backend-5nnu.onrender.com", {
-  transports: ["websocket"]
-});
-
+// --- CONFIG & NETWORK ---
+const socket = io("https://beat-backend-5nnu.onrender.com", { transports: ["websocket"] }); // CHANGE THIS URL TO YOUR SERVER
 const STEPS = 16;
-let grid = null;
+let grid = {};
 let currentStep = 0;
-
-// Sounds
-const kick = new Tone.Player("https://cdn.jsdelivr.net/gh/Tonejs/Tone.js/examples/audio/drum-samples/CR78/kick.mp3").toDestination();
-const snare = new Tone.Player("https://cdn.jsdelivr.net/gh/Tonejs/Tone.js/examples/audio/drum-samples/CR78/snare.mp3").toDestination();
-const hihat = new Tone.Player("https://cdn.jsdelivr.net/gh/Tonejs/Tone.js/examples/audio/drum-samples/CR78/hihat.mp3").toDestination();
-
-// Unlock audio
-document.body.onclick = async () => {
-  await Tone.start();
-};
-
-// Store buttons
-const buttons = {};
-
-// Build grid ONCE
-function buildGrid() {
-  const container = document.getElementById("grid");
-  container.innerHTML = "";
-
-  Object.keys(grid).forEach(instrument => {
-    const row = document.createElement("div");
-
-    const label = document.createElement("span");
-    label.innerText = instrument.toUpperCase() + " ";
-    label.style.width = "80px";
-    label.style.display = "inline-block";
-
-    row.appendChild(label);
-
-    buttons[instrument] = [];
-
-    grid[instrument].forEach((active, i) => {
-      const btn = document.createElement("button");
-
-      btn.style.margin = "3px";
-      btn.style.width = "30px";
-      btn.style.height = "30px";
-      btn.style.border = "none";
-      btn.style.borderRadius = "4px";
-
-      btn.onclick = () => {
-        socket.emit("toggleStep", {
-          instrument,
-          stepIndex: i
-        });
-      };
-
-      row.appendChild(btn);
-      buttons[instrument].push(btn);
-    });
-
-    container.appendChild(row);
-  });
-
-  updateGridUI();
-}
-
-// Update UI WITHOUT rebuilding
-function updateGridUI() {
-  Object.keys(grid).forEach(instrument => {
-    grid[instrument].forEach((active, i) => {
-      const btn = buttons[instrument][i];
-
-      // Base color
-      btn.style.background = active ? "#00ff88" : "#333";
-
-      // Highlight current step
-      if (i === currentStep) {
-        btn.style.border = "2px solid yellow";
-      } else {
-        btn.style.border = "none";
-      }
-    });
-  });
-}
-
-// Play sounds + animate step
-socket.on("tick", ({ step, grid: serverGrid }) => {
-  if (!serverGrid) return;
-
-  currentStep = step;
-  grid = serverGrid;
-
-  // Play sounds
-  if (grid.kick[step]) kick.start();
-  if (grid.snare[step]) snare.start();
-  if (grid.hihat[step]) hihat.start();
-
-  updateGridUI();
-});
-
-// Init
-socket.on("init", (data) => {
-  grid = data.grid;
-  buildGrid();
-});
-
-// Updates
-socket.on("gridUpdate", (newGrid) => {
-  grid = newGrid;
-  updateGridUI();
-});
-
-// BPM
-const bpmSlider = document.getElementById("bpm");
-const bpmVal = document.getElementById("bpmVal");
-
-bpmSlider.oninput = () => {
-  bpmVal.innerText = bpmSlider.value + " BPM";
-  socket.emit("setBPM", Number(bpmSlider.value));
-};
-</script>
-
-</body>
-</html>
+let isPlaying = false;
