@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Multiplayer Beat Maker</title>
+  <script src="https://cdn.jsdelivr.net/npm/tone"></script>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body style="background:#111;color:white;font-family:sans-serif">
+
+<h2>🎵 Multiplayer Beat Maker</h2>
+
+<input id="bpm" type="range" min="60" max="180" value="100"/>
+<span id="bpmVal">100 BPM</span>
+
+<div id="grid"></div>
+
+<script>
+const socket = io("https://beat-backend-5nnu.onrender.com/");
+
+const STEPS = 16;
+let grid = null;
+
+// Sounds
+const kick = new Tone.Player("https://cdn.jsdelivr.net/gh/Tonejs/Tone.js/examples/audio/drum-samples/CR78/kick.mp3").toDestination();
+const snare = new Tone.Player("https://cdn.jsdelivr.net/gh/Tonejs/Tone.js/examples/audio/drum-samples/CR78/snare.mp3").toDestination();
+const hihat = new Tone.Player("https://cdn.jsdelivr.net/gh/Tonejs/Tone.js/examples/audio/drum-samples/CR78/hihat.mp3").toDestination();
+
+// Unlock audio
+document.body.onclick = async () => {
+  await Tone.start();
+};
+
+// Build grid UI
+function buildGrid() {
+  const container = document.getElementById("grid");
+  container.innerHTML = "";
+
+  Object.keys(grid).forEach(instrument => {
+    const row = document.createElement("div");
+
+    grid[instrument].forEach((active, i) => {
+      const btn = document.createElement("button");
+
+      btn.style.margin = "4px";
+      btn.style.width = "30px";
+      btn.style.height = "30px";
+      btn.style.background = active ? "lime" : "#333";
+
+      btn.onclick = () => {
+        socket.emit("toggleStep", {
+          instrument,
+          stepIndex: i
+        });
+      };
+
+      row.appendChild(btn);
+    });
+
+    container.appendChild(document.createTextNode(instrument));
+    container.appendChild(document.createElement("br"));
+    container.appendChild(row);
+  });
+}
+
+// Play sounds on server tick
+socket.on("tick", ({ step, grid }) => {
+  if (!grid) return;
+
+  if (grid.kick[step]) kick.start();
+  if (grid.snare[step]) snare.start();
+  if (grid.hihat[step]) hihat.start();
+});
+
+// Init
+socket.on("init", (data) => {
+  grid = data.grid;
+  buildGrid();
+});
+
+// Updates
+socket.on("gridUpdate", (newGrid) => {
+  grid = newGrid;
+  buildGrid();
+});
+
+// BPM
+const bpmSlider = document.getElementById("bpm");
+const bpmVal = document.getElementById("bpmVal");
+
+bpmSlider.oninput = () => {
+  bpmVal.innerText = bpmSlider.value + " BPM";
+  socket.emit("setBPM", Number(bpmSlider.value));
+};
+</script>
+
+</body>
+</html>
