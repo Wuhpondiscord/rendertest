@@ -29,20 +29,20 @@
       user-select: none;
     }
 
-    /* Start Overlay (Required for Browsers/Discord) */
     #start-overlay {
       position: fixed;
       top: 0; left: 0; width: 100vw; height: 100vh;
       background: rgba(0,0,0,0.9);
       display: flex;
+      flex-direction: column;
       justify-content: center;
       align-items: center;
       z-index: 1000;
       cursor: pointer;
     }
-    #start-overlay h1 { color: var(--accent); }
+    #start-overlay h1 { color: var(--accent); margin-bottom: 10px; }
+    #start-overlay p { color: #ccc; font-size: 14px; }
 
-    /* Transport Bar (Top) */
     .transport {
       background: var(--panel);
       width: 100%;
@@ -53,6 +53,15 @@
       gap: 20px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.5);
       margin-bottom: 30px;
+      position: relative;
+    }
+
+    #status {
+      position: absolute;
+      left: 20px;
+      font-size: 12px;
+      color: #f38ba8;
+      font-weight: bold;
     }
 
     button {
@@ -77,7 +86,6 @@
       border-radius: 4px;
     }
 
-    /* Channel Rack */
     .channel-rack {
       background: var(--panel);
       padding: 20px;
@@ -85,14 +93,10 @@
       box-shadow: 0 8px 20px rgba(0,0,0,0.5);
     }
 
-    .row {
-      display: flex;
-      align-items: center;
-      margin-bottom: 8px;
-    }
+    .row { display: flex; align-items: center; margin-bottom: 8px; }
 
     .instrument-label {
-      width: 100px;
+      width: 80px;
       text-transform: capitalize;
       font-weight: bold;
       background: var(--bg);
@@ -113,20 +117,19 @@
       padding: 0;
     }
 
-    /* FL Studio Style Beat Grouping (Groups of 4) */
     .step-btn.beat-0 { background: var(--step-off-1); }
     .step-btn.beat-1 { background: var(--step-off-2); }
-
-    /* Active states applied via JS */
   </style>
 </head>
 <body>
 
 <div id="start-overlay" onclick="initAudio()">
   <h1>Click Anywhere to Start</h1>
+  <p>(It may take 50 seconds for the multiplayer server to wake up)</p>
 </div>
 
 <div class="transport">
+  <div id="status">🔴 OFFLINE (Waking up server...)</div>
   <button id="playBtn" onclick="togglePlay()">PLAY</button>
   <button onclick="clearGrid()">CLEAR</button>
   <div class="bpm-container">
@@ -138,9 +141,185 @@
 <div class="channel-rack" id="rack"></div>
 
 <script>
-// --- CONFIG & NETWORK ---
-const socket = io("https://beat-backend-5nnu.onrender.com", { transports: ["websocket"] }); // CHANGE THIS URL TO YOUR SERVER
+const socket = io("https://beat-backend-5nnu.onrender.com", { transports: ["websocket"] });
 const STEPS = 16;
-let grid = {};
 let currentStep = 0;
 let isPlaying = false;
+let buttons = {};
+
+// Fallback grid so the UI loads instantly even if Render is asleep
+let grid = {
+  kick: Array(STEPS).fill(false),
+  snare: Array(STEPS).fill(false),
+  hihat: Array(STEPS).fill(false),
+  tom: Array(STEPS).fill(false),
+  bongo: Array(STEPS).fill(false)
+};
+
+// Safe, permanent URLs directly from Tone.js Github
+const kit = new Tone.Players({
+  kick: "https://cdn.jsdelivr.net/gh/Tonejs/Tone.js/examples/audio/drum-samples/CR78/kick.mp3",
+  snare: "https://cdn.jsdelivr.net/gh/Tonejs/Tone.js/examples/audio/drum-samples/CR78/snare.mp3",
+  hihat: "https://cdn.jsdelivr.net/gh/Tonejs/Tone.js/examples/audio/drum-samples/CR78/hihat.mp3",
+  tom: "https://cdn.jsdelivr.net/gh/Tonejs/Tone.js/examples/audio/drum-samples/CR78/tom.mp3",
+  bongo: "https://cdn.jsdelivr.net/gh/Tonejs/Tone.js/examples/audio/drum-samples/CR78/bongo.mp3"
+}).toDestination();
+
+// Build the UI immediately so it's not a blank screen
+buildGrid();
+
+async function initAudio() {
+  try {
+    await Tone.start();
+    document.getElementById("start-overlay").style.display = "none";
+    Tone.Transport.bpm.value = document.getElementById("bpm").value;
+  } catch (err) {
+    console.error("Audio failed to start:", err);
+    alert("Audio failed to load. Try refreshing.");
+  }
+}
+
+Tone.Transport.scheduleRepeat((time) => {
+  Object.keys(grid).forEach(inst => {
+    if (grid[inst][currentStep] && kit.loaded) {
+      kit.player(inst).start(time);
+    }
+  });
+
+  Tone.Draw.schedule(() => {
+    updateGridUI(currentStep);
+  }, time);
+
+  currentStep = (currentStep + 1) % STEPS;
+}, "16n");
+
+function buildGrid() {
+  const rack = document.getElementById("rack");
+  rack.innerHTML = "";
+  buttons = {};
+
+  Object.keys(grid).forEach(instrument => {
+    const row = document.createElement("div");
+    row.className = "row";
+
+    const label = document.createElement("div");
+    label.className = "instrument-label";
+    label.innerText = instrument;
+    row.appendChild(label);
+
+    const stepsContainer = document.createElement("div");
+    stepsContainer.className = "steps";
+    buttons[instrument] = [];
+
+    grid[instrument].forEach((active, i) => {
+      const btn = document.createElement("button");
+      btn.className = `step-btn beat-${Math.floor(i / 4) % 2}`;
+
+      btn.onclick = () => {
+        // Optimistic UI update for when offline
+        grid[instrument][i] = !grid[instrument][i];
+        updateGridUI(-1);
+        socket.emit("toggleStep", { instrument, stepIndex: i });
+      };
+
+      stepsContainer.appendChild(btn);
+      buttons[instrument].push(btn);
+    });
+
+    row.appendChild(stepsContainer);
+    rack.appendChild(row);
+  });
+  updateGridUI(-1);
+}
+
+function updateGridUI(stepPlaying) {
+  Object.keys(grid).forEach(instrument => {
+    if(!buttons[instrument]) return; // Safety check
+    
+    grid[instrument].forEach((active, i) => {
+      const btn = buttons[instrument][i];
+      if(!btn) return;
+      
+      btn.style.background = active ? "var(--step-on)" : "";
+
+      if (i === stepPlaying) {
+        btn.style.borderColor = "var(--step-active)";
+        btn.style.transform = "scale(1.05)";
+      } else {
+        btn.style.borderColor = "transparent";
+        btn.style.transform = "scale(1)";
+      }
+    });
+  });
+}
+
+function togglePlay() {
+  isPlaying = !isPlaying;
+  socket.emit("togglePlay", isPlaying);
+  applyPlayState(isPlaying);
+}
+
+function clearGrid() {
+  socket.emit("clearGrid");
+  // Optimistic offline clear
+  Object.keys(grid).forEach(inst => grid[inst] = Array(STEPS).fill(false));
+  updateGridUI(-1);
+}
+
+function updateBPM(val) {
+  document.getElementById("bpmVal").innerText = val + " BPM";
+  Tone.Transport.bpm.value = val;
+}
+
+function sendBPM(val) {
+  socket.emit("setBPM", Number(val));
+}
+
+function applyPlayState(playing) {
+  isPlaying = playing;
+  const btn = document.getElementById("playBtn");
+  if (isPlaying) {
+    Tone.Transport.start();
+    btn.innerText = "PAUSE";
+    btn.style.background = "var(--accent)";
+  } else {
+    Tone.Transport.pause();
+    btn.innerText = "PLAY";
+    btn.style.background = "var(--step-on)";
+  }
+}
+
+// --- SOCKET EVENTS ---
+socket.on("connect", () => {
+  document.getElementById("status").innerText = "🟢 ONLINE";
+  document.getElementById("status").style.color = "#a6e3a1";
+});
+
+socket.on("disconnect", () => {
+  document.getElementById("status").innerText = "🔴 OFFLINE";
+  document.getElementById("status").style.color = "#f38ba8";
+});
+
+socket.on("initState", (state) => {
+  grid = state.grid;
+  document.getElementById("bpm").value = state.bpm;
+  updateBPM(state.bpm);
+  buildGrid();
+  applyPlayState(state.isPlaying);
+});
+
+socket.on("gridUpdate", (newGrid) => {
+  grid = newGrid;
+  updateGridUI(-1);
+});
+
+socket.on("playUpdate", applyPlayState);
+
+socket.on("bpmUpdate", (newBpm) => {
+  document.getElementById("bpm").value = newBpm;
+  updateBPM(newBpm);
+});
+</script>
+
+</body>
+</html>
