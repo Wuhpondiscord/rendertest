@@ -4,8 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Discord Channel Rack</title>
-  <script src="https://cdn.jsdelivr.net/npm/tone"></script>
-  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  
+  <!-- UPDATED: More reliable CDNs for Discord Environments -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+  
   <style>
     :root {
       --bg: #1e1e2e;
@@ -32,7 +35,7 @@
     #start-overlay {
       position: fixed;
       top: 0; left: 0; width: 100vw; height: 100vh;
-      background: rgba(0,0,0,0.9);
+      background: rgba(0,0,0,0.95);
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -41,8 +44,8 @@
       cursor: pointer;
     }
     #start-overlay h1 { color: var(--accent); margin-bottom: 10px; }
-    #start-overlay p { color: #ccc; font-size: 14px; }
-    #error-text { color: #f38ba8; margin-top: 20px; font-family: monospace; }
+    #start-overlay p { color: #ccc; font-size: 14px; margin-bottom: 0;}
+    #error-text { color: #f38ba8; margin-top: 20px; font-family: monospace; max-width: 80%; text-align: center;}
 
     .transport {
       background: var(--panel);
@@ -149,6 +152,9 @@ let currentStep = 0;
 let isPlaying = false;
 let buttons = {};
 
+// We define synths as empty right now. We fill it AFTER you click start.
+let synths = {};
+
 // Fallback grid
 let grid = {
   kick: Array(STEPS).fill(false),
@@ -158,72 +164,77 @@ let grid = {
   bongo: Array(STEPS).fill(false)
 };
 
-// --- AUDIO SYNTHESIZERS (NO MP3 FILES NEEDED) ---
-const synths = {
-  kick: new Tone.MembraneSynth().toDestination(),
-  
-  snare: new Tone.NoiseSynth({
-    noise: { type: 'white' },
-    envelope: { attack: 0.005, decay: 0.2, sustain: 0 }
-  }).toDestination(),
-  
-  hihat: new Tone.MetalSynth({
-    frequency: 200,
-    envelope: { attack: 0.001, decay: 0.05, release: 0.01 },
-    harmonicity: 5.1,
-    modulationIndex: 32,
-    resonance: 4000,
-    octaves: 1.5
-  }).toDestination(),
-  
-  tom: new Tone.MembraneSynth({
-    pitchDecay: 0.05,
-    octaves: 4
-  }).toDestination(),
-  
-  bongo: new Tone.MembraneSynth({
-    pitchDecay: 0.01,
-    octaves: 2
-  }).toDestination()
-};
-
-// Adjust volumes so they sound balanced
-synths.hihat.volume.value = -10;
-synths.snare.volume.value = -5;
-synths.tom.volume.value = -5;
-synths.bongo.volume.value = -5;
-
-
+// Build the UI immediately
 buildGrid();
 
-// Audio Unlock 
+// Audio Unlock Function
 async function initAudio() {
+  const errorText = document.getElementById("error-text");
+
+  // Safety Check: Did the Tone.js library get blocked by Discord?
+  if (typeof Tone === "undefined") {
+    errorText.innerText = "CRITICAL ERROR: Tone.js was blocked from downloading by Discord's security, or your internet connection dropped. Try refreshing.";
+    return;
+  }
+
   try {
     await Tone.start();
+    
+    // Create instruments ONLY after Tone is confirmed to be loaded
+    synths = {
+      kick: new Tone.MembraneSynth().toDestination(),
+      snare: new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: { attack: 0.005, decay: 0.2, sustain: 0 }
+      }).toDestination(),
+      hihat: new Tone.MetalSynth({
+        frequency: 200,
+        envelope: { attack: 0.001, decay: 0.05, release: 0.01 },
+        harmonicity: 5.1,
+        modulationIndex: 32,
+        resonance: 4000,
+        octaves: 1.5
+      }).toDestination(),
+      tom: new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 4 }).toDestination(),
+      bongo: new Tone.MembraneSynth({ pitchDecay: 0.01, octaves: 2 }).toDestination()
+    };
+
+    // Adjust volumes
+    synths.hihat.volume.value = -10;
+    synths.snare.volume.value = -5;
+    synths.tom.volume.value = -5;
+    synths.bongo.volume.value = -5;
+
+    // Start the timing loop now that instruments exist
+    startTimingLoop();
+
     document.getElementById("start-overlay").style.display = "none";
     Tone.Transport.bpm.value = document.getElementById("bpm").value;
+
   } catch (err) {
     console.error(err);
-    document.getElementById("error-text").innerText = "Error: " + err.message;
+    errorText.innerText = "Error: " + err.message;
   }
 }
 
-// Timing Loop
-Tone.Transport.scheduleRepeat((time) => {
-  // Trigger Synths
-  if (grid.kick[currentStep]) synths.kick.triggerAttackRelease("C1", "8n", time);
-  if (grid.snare[currentStep]) synths.snare.triggerAttackRelease("16n", time);
-  if (grid.hihat[currentStep]) synths.hihat.triggerAttackRelease("32n", time);
-  if (grid.tom[currentStep]) synths.tom.triggerAttackRelease("G2", "8n", time);
-  if (grid.bongo[currentStep]) synths.bongo.triggerAttackRelease("C5", "16n", time);
+// Timing Loop setup
+function startTimingLoop() {
+  Tone.Transport.scheduleRepeat((time) => {
+    // Trigger Synths
+    if (grid.kick[currentStep]) synths.kick.triggerAttackRelease("C1", "8n", time);
+    if (grid.snare[currentStep]) synths.snare.triggerAttackRelease("16n", time);
+    if (grid.hihat[currentStep]) synths.hihat.triggerAttackRelease("32n", time);
+    if (grid.tom[currentStep]) synths.tom.triggerAttackRelease("G2", "8n", time);
+    if (grid.bongo[currentStep]) synths.bongo.triggerAttackRelease("C5", "16n", time);
 
-  // Sync UI
-  Tone.Draw.schedule(() => {
-    updateGridUI(currentStep);
-  }, time);
+    // Sync UI
+    Tone.Draw.schedule(() => {
+      updateGridUI(currentStep);
+    }, time);
 
-  currentStep = (currentStep + 1) % STEPS;
-}, "16n");
+    currentStep = (currentStep + 1) % STEPS;
+  }, "16n");
+}
 
 // --- UI AND NETWORK LOGIC ---
 function buildGrid() {
@@ -299,7 +310,9 @@ function clearGrid() {
 
 function updateBPM(val) {
   document.getElementById("bpmVal").innerText = val + " BPM";
-  Tone.Transport.bpm.value = val;
+  if (typeof Tone !== "undefined" && Tone.Transport) {
+    Tone.Transport.bpm.value = val;
+  }
 }
 
 function sendBPM(val) {
@@ -309,14 +322,18 @@ function sendBPM(val) {
 function applyPlayState(playing) {
   isPlaying = playing;
   const btn = document.getElementById("playBtn");
-  if (isPlaying) {
-    Tone.Transport.start();
-    btn.innerText = "PAUSE";
-    btn.style.background = "var(--accent)";
-  } else {
-    Tone.Transport.pause();
-    btn.innerText = "PLAY";
-    btn.style.background = "var(--step-on)";
+  
+  // Make sure Tone exists before trying to play/pause
+  if (typeof Tone !== "undefined" && Tone.Transport) {
+    if (isPlaying) {
+      Tone.Transport.start();
+      btn.innerText = "PAUSE";
+      btn.style.background = "var(--accent)";
+    } else {
+      Tone.Transport.pause();
+      btn.innerText = "PLAY";
+      btn.style.background = "var(--step-on)";
+    }
   }
 }
 
