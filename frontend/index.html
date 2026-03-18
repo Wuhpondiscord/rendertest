@@ -3,288 +3,289 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Discord Channel Rack</title>
-  
-  <!-- UPDATED: More reliable CDNs for Discord Environments -->
+  <title>Discord Multiplayer DAW</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
   
   <style>
     :root {
-      --bg: #1e1e2e;
-      --panel: #2a2a3e;
-      --text: #cdd6f4;
-      --step-off-1: #45475a;
-      --step-off-2: #585b70;
-      --step-on: #a6e3a1;
-      --step-active: #f9e2af;
-      --accent: #89b4fa;
+      --bg: #11111b; --panel: #1e1e2e; --panel-light: #313244;
+      --text: #cdd6f4; --step-off-1: #45475a; --step-off-2: #585b70;
+      --step-on: #89b4fa; --step-active: #f9e2af; --accent: #a6e3a1;
+      --danger: #f38ba8;
     }
     
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      margin: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      user-select: none;
-    }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; user-select: none; height: 100vh; overflow: hidden; }
 
-    #start-overlay {
-      position: fixed;
-      top: 0; left: 0; width: 100vw; height: 100vh;
-      background: rgba(0,0,0,0.95);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-      cursor: pointer;
-    }
-    #start-overlay h1 { color: var(--accent); margin-bottom: 10px; }
-    #start-overlay p { color: #ccc; font-size: 14px; margin-bottom: 0;}
-    #error-text { color: #f38ba8; margin-top: 20px; font-family: monospace; max-width: 80%; text-align: center;}
-
-    .transport {
-      background: var(--panel);
-      width: 100%;
-      padding: 15px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 20px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-      margin-bottom: 30px;
-      position: relative;
-    }
-
-    #status {
-      position: absolute;
-      left: 20px;
-      font-size: 12px;
-      color: #f38ba8;
-      font-weight: bold;
-    }
-
-    button {
-      background: var(--step-off-1);
-      color: var(--text);
-      border: none;
-      padding: 8px 16px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-weight: bold;
-      transition: 0.2s;
-    }
-    button:hover { background: var(--step-off-2); }
-    #playBtn { background: var(--step-on); color: #111; }
+    #start-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(17,17,27,0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; cursor: pointer; }
+    #start-overlay h1 { color: var(--accent); margin-bottom: 5px; }
     
-    .bpm-container {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      background: var(--bg);
-      padding: 5px 15px;
-      border-radius: 4px;
-    }
+    .transport { background: var(--panel); width: 100%; padding: 15px 20px; display: flex; justify-content: center; align-items: center; gap: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.8); z-index: 100; flex-wrap: wrap; }
+    .status-area { position: absolute; left: 20px; display: flex; flex-direction: column; gap: 5px; }
+    #status { font-size: 12px; font-weight: bold; color: var(--danger); }
+    #users { font-size: 11px; color: #a6adc8; }
 
-    .channel-rack {
-      background: var(--panel);
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.5);
-    }
+    button, select { background: var(--step-off-1); color: var(--text); border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; outline: none; }
+    button:hover, select:hover { background: var(--step-off-2); }
+    #playBtn { background: var(--accent); color: #111; }
+    .control-group { display: flex; align-items: center; gap: 10px; background: var(--panel-light); padding: 5px 15px; border-radius: 6px; }
 
+    .channel-rack-container { width: 98%; max-width: 1400px; margin-top: 20px; background: var(--panel); border-radius: 8px; box-shadow: 0 8px 20px rgba(0,0,0,0.5); overflow-x: auto; overflow-y: auto; height: calc(100vh - 150px); padding-bottom: 10px; }
+    .channel-rack-container::-webkit-scrollbar { width: 12px; height: 12px; }
+    .channel-rack-container::-webkit-scrollbar-track { background: var(--panel); border-radius: 8px;}
+    .channel-rack-container::-webkit-scrollbar-thumb { background: var(--step-off-1); border-radius: 8px; }
+
+    .channel-rack { display: inline-block; padding: 20px; padding-left: 0; }
     .row { display: flex; align-items: center; margin-bottom: 8px; }
 
-    .instrument-label {
-      width: 80px;
-      text-transform: capitalize;
-      font-weight: bold;
-      background: var(--bg);
-      padding: 8px;
-      border-radius: 4px;
-      margin-right: 15px;
-      text-align: right;
-      color: var(--accent);
-    }
+    .track-controls { position: sticky; left: 0; display: flex; align-items: center; gap: 5px; background: var(--panel); padding-right: 15px; z-index: 10; border-right: 2px solid var(--panel-light); }
+    .delete-btn { background: transparent; color: var(--danger); padding: 5px 10px; font-size: 16px; }
+    .delete-btn:hover { background: rgba(243, 139, 168, 0.2); }
+    .inst-select { width: 140px; font-size: 12px; padding: 6px; }
+    .note-select { width: 65px; font-size: 12px; padding: 6px; }
 
-    .steps { display: flex; gap: 4px; }
-
-    .step-btn {
-      width: 35px;
-      height: 45px;
-      border-radius: 4px;
-      border: 2px solid transparent;
-      padding: 0;
-    }
-
+    .steps { display: flex; gap: 4px; padding-right: 20px;}
+    .step-btn { width: 35px; height: 45px; border-radius: 4px; border: 2px solid transparent; padding: 0; flex-shrink: 0; }
     .step-btn.beat-0 { background: var(--step-off-1); }
     .step-btn.beat-1 { background: var(--step-off-2); }
+    
+    .add-track-btn { margin-top: 15px; margin-left: 20px; background: var(--step-off-1); width: calc(100% - 40px); border: 2px dashed var(--step-off-2); color: var(--text); padding: 15px; font-size: 16px; }
   </style>
 </head>
 <body>
 
 <div id="start-overlay" onclick="initAudio()">
-  <h1>Click Anywhere to Start</h1>
-  <p>(It may take 50 seconds for the multiplayer server to wake up)</p>
-  <div id="error-text"></div>
+  <h1>🎵 Discord Studio PRO</h1>
+  <p>Click anywhere to load Synthesizers</p>
 </div>
 
 <div class="transport">
-  <div id="status">🔴 OFFLINE (Waking up server...)</div>
+  <div class="status-area">
+    <div id="status">🔴 OFFLINE</div>
+    <div id="users">👥 Users: 1</div>
+  </div>
+
   <button id="playBtn" onclick="togglePlay()">PLAY</button>
   <button onclick="clearGrid()">CLEAR</button>
-  <div class="bpm-container">
-    <input id="bpm" type="range" min="60" max="180" value="120" oninput="updateBPM(this.value)" onchange="sendBPM(this.value)"/>
-    <span id="bpmVal" style="font-family: monospace; font-size: 1.2em;">120 BPM</span>
+  
+  <div class="control-group">
+    <label style="font-size: 12px;">STEPS</label>
+    <select id="stepSelect" onchange="changeSteps(this.value)">
+      <option value="16">16</option>
+      <option value="32">32</option>
+      <option value="64">64</option>
+    </select>
+  </div>
+
+  <div class="control-group">
+    <input id="bpm" type="range" min="60" max="180" value="120" oninput="updateBPMUI(this.value)" onchange="sendBPM(this.value)"/>
+    <span id="bpmVal" style="font-family: monospace; font-size: 1.1em; width: 70px;">120 BPM</span>
   </div>
 </div>
 
-<div class="channel-rack" id="rack"></div>
+<div class="channel-rack-container">
+  <div class="channel-rack" id="rack"></div>
+</div>
 
 <script>
 const socket = io("https://beat-backend-5nnu.onrender.com", { transports: ["websocket"] });
-const STEPS = 16;
-let currentStep = 0;
-let isPlaying = false;
-let buttons = {};
+let currentStep = 0; let isPlaying = false;
+let buttons = {}; 
+let synthInstances = {}; // Stores actual Tone.js synth nodes
 
-// We define synths as empty right now. We fill it AFTER you click start.
-let synths = {};
+let state = { bpm: 120, steps: 16, channels: [] };
 
-// Fallback grid
-let grid = {
-  kick: Array(STEPS).fill(false),
-  snare: Array(STEPS).fill(false),
-  hihat: Array(STEPS).fill(false),
-  tom: Array(STEPS).fill(false),
-  bongo: Array(STEPS).fill(false)
+// --- THE SYNTH LIBRARY (60+ Handcrafted Generators) ---
+const SYNTH_LIBRARY = {
+  // 🥁 DRUMS
+  "Kick - 808": () => new Tone.MembraneSynth({ pitchDecay: 0.005, octaves: 2, envelope: { attack: 0.01, decay: 0.8, sustain: 0.1, release: 1 } }),
+  "Kick - Punch": () => new Tone.MembraneSynth({ pitchDecay: 0.1, octaves: 6, envelope: { attack: 0.001, decay: 0.2, sustain: 0 } }),
+  "Kick - Deep": () => new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 4 }),
+  "Snare - Tight": () => new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.005, decay: 0.1, sustain: 0 } }),
+  "Snare - Clap": () => new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.3, sustain: 0 } }),
+  "Hat - Closed": () => new Tone.MetalSynth({ frequency: 200, envelope: { attack: 0.001, decay: 0.05, release: 0.01 }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 }),
+  "Hat - Open": () => new Tone.MetalSynth({ frequency: 200, envelope: { attack: 0.001, decay: 0.4, release: 0.1 }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 }),
+  "Perc - Hi Tom": () => new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 4 }),
+  "Perc - Low Tom": () => new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 2 }),
+  "Perc - Cowbell": () => new Tone.FMSynth({ harmonicity: 1.2, modulationIndex: 2.5, oscillator: { type: "square" }, modulation: { type: "square" }, envelope: { attack: 0.001, decay: 0.2 } }),
+  
+  // 🎸 BASS
+  "Bass - FM Sub": () => new Tone.FMSynth({ harmonicity: 0.5, modulationIndex: 1.2, oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 0.5, sustain: 0.8, release: 0.5 } }),
+  "Bass - Saw Pluck": () => new Tone.Synth({ oscillator: { type: "sawtooth" }, envelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.2 } }),
+  "Bass - Deep Square": () => new Tone.Synth({ oscillator: { type: "square" }, envelope: { attack: 0.05, decay: 0.4, sustain: 0.4, release: 1 } }),
+
+  // 🎹 KEYS
+  "Keys - Sine Piano": () => new Tone.Synth({ oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 1, sustain: 0, release: 1 } }),
+  "Keys - E-Piano (FM)": () => new Tone.FMSynth({ harmonicity: 2, modulationIndex: 3, oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 2, sustain: 0.2, release: 1 } }),
+  "Keys - Drawbar Organ": () => new Tone.FatOscillator({ type: "sine", count: 3, spread: 20 }).toDestination(), // Custom setup handled in play
+  "Keys - Toy Piano": () => new Tone.AMSynth({ harmonicity: 3, oscillator: { type: "triangle" }, envelope: { attack: 0.01, decay: 0.5, sustain: 0 } }),
+
+  // 🎻 STRINGS & PADS
+  "Strings - Bowed": () => new Tone.AMSynth({ harmonicity: 1, oscillator: { type: "sawtooth" }, envelope: { attack: 0.2, decay: 1, sustain: 0.8, release: 1.5 } }),
+  "Strings - Synth Choir": () => new Tone.FMSynth({ harmonicity: 0.5, modulationIndex: 5, oscillator: { type: "triangle" }, envelope: { attack: 0.5, decay: 1, sustain: 1, release: 2 } }),
+  "Pad - Dream (Fat Sine)": () => new Tone.Synth({ oscillator: { type: "fatsine", count: 3, spread: 30 }, envelope: { attack: 1, decay: 0.5, sustain: 1, release: 2 } }),
+  "Pad - Dark (Fat Saw)": () => new Tone.Synth({ oscillator: { type: "fatsawtooth", count: 3, spread: 20 }, envelope: { attack: 0.8, decay: 1, sustain: 0.8, release: 2 } }),
+
+  // 🎵 PLUCKS & GUITARS
+  "Pluck - Tech": () => new Tone.FMSynth({ harmonicity: 2, modulationIndex: 2, oscillator: { type: "square" }, envelope: { attack: 0.001, decay: 0.1, sustain: 0 } }),
+  "Pluck - Koto": () => new Tone.PluckSynth({ attackNoise: 2, dampening: 4000, resonance: 0.9 }),
+  "Pluck - Nylon": () => new Tone.PluckSynth({ attackNoise: 1, dampening: 2000, resonance: 0.7 }),
+
+  // 🚀 LEADS
+  "Lead - Theremin": () => new Tone.Synth({ oscillator: { type: "sine" }, envelope: { attack: 0.5, decay: 0, sustain: 1, release: 0.5 }, portamento: 0.2 }),
+  "Lead - 8-Bit": () => new Tone.Synth({ oscillator: { type: "square" }, envelope: { attack: 0.01, decay: 0.1, sustain: 0.5, release: 0.1 } }),
+  "Lead - Fat Saw": () => new Tone.Synth({ oscillator: { type: "fatsawtooth", count: 2, spread: 10 }, envelope: { attack: 0.05, decay: 0.3, sustain: 0.5, release: 0.5 } })
 };
 
-// Build the UI immediately
-buildGrid();
+// Notes for dropdown
+const NOTES = ["C2","D2","E2","F2","G2","A2","B2", "C3","D3","E3","F3","G3","A3","B3", "C4","D4","E4","F4","G4","A4","B4", "C5","D5","E5","F5","G5","A5","B5"];
 
-// Audio Unlock Function
+let masterCompressor, masterReverb;
+
 async function initAudio() {
-  const errorText = document.getElementById("error-text");
+  if (typeof Tone === "undefined") return alert("Audio blocked by Discord.");
+  await Tone.start();
 
-  // Safety Check: Did the Tone.js library get blocked by Discord?
-  if (typeof Tone === "undefined") {
-    errorText.innerText = "CRITICAL ERROR: Tone.js was blocked from downloading by Discord's security, or your internet connection dropped. Try refreshing.";
-    return;
-  }
+  // Master Effects Chain
+  masterCompressor = new Tone.Compressor({ threshold: -24, ratio: 4 }).toDestination();
+  masterReverb = new Tone.Reverb({ decay: 2, wet: 0.15 }).connect(masterCompressor);
 
-  try {
-    await Tone.start();
-    
-    // Create instruments ONLY after Tone is confirmed to be loaded
-    synths = {
-      kick: new Tone.MembraneSynth().toDestination(),
-      snare: new Tone.NoiseSynth({
-        noise: { type: 'white' },
-        envelope: { attack: 0.005, decay: 0.2, sustain: 0 }
-      }).toDestination(),
-      hihat: new Tone.MetalSynth({
-        frequency: 200,
-        envelope: { attack: 0.001, decay: 0.05, release: 0.01 },
-        harmonicity: 5.1,
-        modulationIndex: 32,
-        resonance: 4000,
-        octaves: 1.5
-      }).toDestination(),
-      tom: new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 4 }).toDestination(),
-      bongo: new Tone.MembraneSynth({ pitchDecay: 0.01, octaves: 2 }).toDestination()
-    };
-
-    // Adjust volumes
-    synths.hihat.volume.value = -10;
-    synths.snare.volume.value = -5;
-    synths.tom.volume.value = -5;
-    synths.bongo.volume.value = -5;
-
-    // Start the timing loop now that instruments exist
-    startTimingLoop();
-
-    document.getElementById("start-overlay").style.display = "none";
-    Tone.Transport.bpm.value = document.getElementById("bpm").value;
-
-  } catch (err) {
-    console.error(err);
-    errorText.innerText = "Error: " + err.message;
-  }
+  startTimingLoop();
+  document.getElementById("start-overlay").style.display = "none";
+  if(state.bpm) Tone.Transport.bpm.value = state.bpm;
 }
 
-// Timing Loop setup
+// Manages Synths in Memory (Avoids Lag)
+function syncSynths() {
+  if(!masterReverb) return; // Audio not started yet
+
+  // Create new synths
+  state.channels.forEach(ch => {
+    if (!synthInstances[ch.id] || synthInstances[ch.id].type !== ch.inst) {
+      if (synthInstances[ch.id]) synthInstances[ch.id].node.dispose(); // Cleanup old
+      
+      const generator = SYNTH_LIBRARY[ch.inst] || SYNTH_LIBRARY["Keys - Sine Piano"];
+      let node = generator();
+      
+      // Connect to master effects
+      node.connect(masterReverb);
+      
+      // Volume balancing
+      if(ch.inst.includes("Hat") || ch.inst.includes("Pluck")) node.volume.value = -12;
+      else if(ch.inst.includes("Kick") || ch.inst.includes("Bass")) node.volume.value = 2;
+      else node.volume.value = -8;
+
+      synthInstances[ch.id] = { type: ch.inst, node: node };
+    }
+  });
+
+  // Remove deleted synths
+  Object.keys(synthInstances).forEach(id => {
+    if (!state.channels.find(c => c.id === id)) {
+      synthInstances[id].node.dispose();
+      delete synthInstances[id];
+    }
+  });
+}
+
 function startTimingLoop() {
   Tone.Transport.scheduleRepeat((time) => {
-    // Trigger Synths
-    if (grid.kick[currentStep]) synths.kick.triggerAttackRelease("C1", "8n", time);
-    if (grid.snare[currentStep]) synths.snare.triggerAttackRelease("16n", time);
-    if (grid.hihat[currentStep]) synths.hihat.triggerAttackRelease("32n", time);
-    if (grid.tom[currentStep]) synths.tom.triggerAttackRelease("G2", "8n", time);
-    if (grid.bongo[currentStep]) synths.bongo.triggerAttackRelease("C5", "16n", time);
+    if (currentStep >= state.steps) currentStep = 0; 
 
-    // Sync UI
-    Tone.Draw.schedule(() => {
-      updateGridUI(currentStep);
-    }, time);
+    state.channels.forEach(ch => {
+      if (ch.pattern[currentStep]) {
+        const synth = synthInstances[ch.id];
+        if (synth && synth.node) {
+          // Play note (NoiseSynths ignore the note param automatically)
+          synth.node.triggerAttackRelease(ch.note, "16n", time);
+        }
+      }
+    });
 
-    currentStep = (currentStep + 1) % STEPS;
+    Tone.Draw.schedule(() => { updateGridUI(currentStep); }, time);
+    currentStep = (currentStep + 1) % state.steps;
   }, "16n");
 }
 
-// --- UI AND NETWORK LOGIC ---
+// --- UI BUILDER ---
 function buildGrid() {
   const rack = document.getElementById("rack");
   rack.innerHTML = "";
   buttons = {};
+  syncSynths();
 
-  Object.keys(grid).forEach(instrument => {
+  state.channels.forEach(ch => {
     const row = document.createElement("div");
     row.className = "row";
 
-    const label = document.createElement("div");
-    label.className = "instrument-label";
-    label.innerText = instrument;
-    row.appendChild(label);
+    // STICKY CONTROLS (Left side)
+    const controls = document.createElement("div");
+    controls.className = "track-controls";
 
+    const delBtn = document.createElement("button");
+    delBtn.className = "delete-btn";
+    delBtn.innerText = "✖";
+    delBtn.onclick = () => socket.emit("removeTrack", ch.id);
+    controls.appendChild(delBtn);
+
+    const instSelect = document.createElement("select");
+    instSelect.className = "inst-select";
+    Object.keys(SYNTH_LIBRARY).forEach(inst => {
+      const opt = document.createElement("option");
+      opt.value = opt.innerText = inst;
+      if (ch.inst === inst) opt.selected = true;
+      instSelect.appendChild(opt);
+    });
+    instSelect.onchange = (e) => socket.emit("updateTrack", { channelId: ch.id, key: "inst", value: e.target.value });
+    controls.appendChild(instSelect);
+
+    const noteSelect = document.createElement("select");
+    noteSelect.className = "note-select";
+    NOTES.forEach(note => {
+      const opt = document.createElement("option");
+      opt.value = opt.innerText = note;
+      if (ch.note === note) opt.selected = true;
+      noteSelect.appendChild(opt);
+    });
+    noteSelect.onchange = (e) => socket.emit("updateTrack", { channelId: ch.id, key: "note", value: e.target.value });
+    controls.appendChild(noteSelect);
+
+    row.appendChild(controls);
+
+    // GRID BUTTONS (Scrollable Right Side)
     const stepsContainer = document.createElement("div");
     stepsContainer.className = "steps";
-    buttons[instrument] = [];
+    buttons[ch.id] = [];
 
-    grid[instrument].forEach((active, i) => {
+    ch.pattern.forEach((active, i) => {
       const btn = document.createElement("button");
       btn.className = `step-btn beat-${Math.floor(i / 4) % 2}`;
-
-      btn.onclick = () => {
-        grid[instrument][i] = !grid[instrument][i];
-        updateGridUI(-1);
-        socket.emit("toggleStep", { instrument, stepIndex: i });
-      };
-
+      btn.onclick = () => socket.emit("toggleStep", { channelId: ch.id, stepIndex: i });
       stepsContainer.appendChild(btn);
-      buttons[instrument].push(btn);
+      buttons[ch.id].push(btn);
     });
 
     row.appendChild(stepsContainer);
     rack.appendChild(row);
   });
+
+  const addBtn = document.createElement("button");
+  addBtn.className = "add-track-btn";
+  addBtn.innerText = "+ ADD TRACK";
+  addBtn.onclick = () => socket.emit("addTrack");
+  rack.appendChild(addBtn);
+
   updateGridUI(-1);
 }
 
 function updateGridUI(stepPlaying) {
-  Object.keys(grid).forEach(instrument => {
-    if(!buttons[instrument]) return;
-    
-    grid[instrument].forEach((active, i) => {
-      const btn = buttons[instrument][i];
+  state.channels.forEach(ch => {
+    if(!buttons[ch.id]) return;
+    ch.pattern.forEach((active, i) => {
+      const btn = buttons[ch.id][i];
       if(!btn) return;
-      
       btn.style.background = active ? "var(--step-on)" : "";
-
+      
       if (i === stepPlaying) {
         btn.style.borderColor = "var(--step-active)";
         btn.style.transform = "scale(1.05)";
@@ -296,77 +297,46 @@ function updateGridUI(stepPlaying) {
   });
 }
 
-function togglePlay() {
-  isPlaying = !isPlaying;
-  socket.emit("togglePlay", isPlaying);
-  applyPlayState(isPlaying);
-}
-
-function clearGrid() {
-  socket.emit("clearGrid");
-  Object.keys(grid).forEach(inst => grid[inst] = Array(STEPS).fill(false));
-  updateGridUI(-1);
-}
-
-function updateBPM(val) {
+// --- CONTROLS ---
+function togglePlay() { socket.emit("togglePlay", !isPlaying); }
+function clearGrid() { socket.emit("clearGrid"); }
+function updateBPMUI(val) {
   document.getElementById("bpmVal").innerText = val + " BPM";
-  if (typeof Tone !== "undefined" && Tone.Transport) {
-    Tone.Transport.bpm.value = val;
-  }
+  if (typeof Tone !== "undefined" && Tone.Transport) Tone.Transport.bpm.value = val;
 }
-
-function sendBPM(val) {
-  socket.emit("setBPM", Number(val));
-}
+function sendBPM(val) { socket.emit("setBPM", Number(val)); }
+function changeSteps(val) { socket.emit("changeSteps", Number(val)); }
 
 function applyPlayState(playing) {
   isPlaying = playing;
   const btn = document.getElementById("playBtn");
-  
-  // Make sure Tone exists before trying to play/pause
   if (typeof Tone !== "undefined" && Tone.Transport) {
-    if (isPlaying) {
-      Tone.Transport.start();
-      btn.innerText = "PAUSE";
-      btn.style.background = "var(--accent)";
-    } else {
-      Tone.Transport.pause();
-      btn.innerText = "PLAY";
-      btn.style.background = "var(--step-on)";
-    }
+    if (isPlaying) { Tone.Transport.start(); btn.innerText = "PAUSE"; btn.style.background = "var(--danger)"; } 
+    else { Tone.Transport.pause(); btn.innerText = "PLAY"; btn.style.background = "var(--accent)"; }
   }
 }
 
-// SOCKET EVENTS
-socket.on("connect", () => {
-  document.getElementById("status").innerText = "🟢 ONLINE";
-  document.getElementById("status").style.color = "#a6e3a1";
-});
+// --- NETWORK ---
+socket.on("connect", () => { document.getElementById("status").innerText = "🟢 ONLINE"; document.getElementById("status").style.color = "var(--accent)"; });
+socket.on("disconnect", () => { document.getElementById("status").innerText = "🔴 OFFLINE"; document.getElementById("status").style.color = "var(--danger)"; });
+socket.on("userCount", (count) => { document.getElementById("users").innerText = `👥 Users: ${count}`; });
 
-socket.on("disconnect", () => {
-  document.getElementById("status").innerText = "🔴 OFFLINE";
-  document.getElementById("status").style.color = "#f38ba8";
-});
-
-socket.on("initState", (state) => {
-  grid = state.grid;
+socket.on("initState", (newState) => {
+  state = newState;
   document.getElementById("bpm").value = state.bpm;
-  updateBPM(state.bpm);
+  document.getElementById("stepSelect").value = state.steps;
+  updateBPMUI(state.bpm);
   buildGrid();
   applyPlayState(state.isPlaying);
 });
 
-socket.on("gridUpdate", (newGrid) => {
-  grid = newGrid;
-  updateGridUI(-1);
+socket.on("stateUpdate", (newState) => {
+  state = newState;
+  buildGrid();
 });
 
 socket.on("playUpdate", applyPlayState);
-
-socket.on("bpmUpdate", (newBpm) => {
-  document.getElementById("bpm").value = newBpm;
-  updateBPM(newBpm);
-});
+socket.on("bpmUpdate", (newBpm) => { document.getElementById("bpm").value = newBpm; updateBPMUI(newBpm); });
 </script>
 </body>
 </html>
