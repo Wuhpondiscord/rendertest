@@ -41,7 +41,9 @@ app.use(cors({
 app.use(express.json());
 
 const io = new Server(server, {
-  path: "/api/socket.io",
+  // NOTE: Discord URL mapping prefixes cannot contain dots.
+  // /api/socketio (no dot) instead of /api/socket.io
+  path: "/api/socketio",
   cors: {
     origin: [
       "https://wuhpondiscord.github.io",
