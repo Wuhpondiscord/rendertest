@@ -5,8 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Sleezy Records</title>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
+  <!-- Tone.js and lamejs loaded dynamically in boot() to use same-origin proxy in Discord -->
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 
@@ -935,7 +934,34 @@ var _bootStarted = false;
 async function boot(){
   if(_bootStarted){ console.warn("boot() called twice — ignoring"); return; }
   _bootStarted = true;
-  ovMsg("LOADING...", 10);
+  ovMsg("LOADING...", 5);
+
+  // ── Step 0: load Tone.js and lamejs ────────────────────────────────────
+  // External CDNs are blocked by Discord's CSP — serve from same-origin /api/lib/
+  // In browser, cdnjs is fine but we use the same path for consistency.
+  function loadScript(src){
+    return Promise.race([
+      new Promise(function(res, rej){
+        var s = document.createElement("script");
+        s.src = src;
+        s.onload = res;
+        s.onerror = function(){ rej(new Error("Failed: " + src)); };
+        document.head.appendChild(s);
+      }),
+      new Promise(function(_, rej){ setTimeout(function(){ rej(new Error("Timeout: " + src)); }, 15000); })
+    ]);
+  }
+
+  try{
+    ovMsg("LOADING TONE.JS...", 8);
+    await loadScript("/api/lib/tone");
+    console.log("Tone.js loaded, Tone:", typeof Tone);
+  }catch(e){ console.warn("Tone.js load failed:", e.message); }
+
+  try{
+    await loadScript("/api/lib/lame");
+    console.log("lamejs loaded, lamejs:", typeof lamejs);
+  }catch(e){ console.warn("lamejs load failed:", e.message); }
 
   // Log full URLs so we can see exactly what's being fetched
   console.info("IN_DISCORD: " + IN_DISCORD);
