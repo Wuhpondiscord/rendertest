@@ -173,12 +173,14 @@ app.post("/api/token", async (req, res) => {
         code,
       }),
     });
-    const data = await r.json();
-    console.log("TOKEN: Discord responded status:", r.status, "has access_token:", !!data.access_token, "error:", data.error || "none");
+    const text = await r.text();
+    console.log("TOKEN: Discord response status:", r.status, "body:", text.slice(0,200));
+    const data = JSON.parse(text);
+    console.log("TOKEN: has access_token:", !!data.access_token, "error:", data.error || "none");
     if (data.error) return res.status(400).json({ error: data.error_description || data.error });
     res.json({ access_token: data.access_token });
   } catch (err) {
-    console.error("TOKEN: fetch to Discord failed:", err.message, err.cause?.message || "");
+    console.error("TOKEN: failed:", err.message);
     res.status(500).json({ error: "TOKEN_EXCHANGE_FAILED", detail: err.message });
   }
 });
