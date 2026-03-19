@@ -102,6 +102,25 @@ function findLayer(st, beatId, layerId) {
 // ════════════════════════════════════════════════════════════════
 //  HTTP ROUTES
 // ════════════════════════════════════════════════════════════════
+// Serve the Discord Embedded App SDK through our proxy.
+// This allows the Activity to import it without CSP violations —
+// Discord blocks external CDN imports, but /api/* is whitelisted via URL mappings.
+app.get("/api/sdk", async (req, res) => {
+  try {
+    const r = await fetch(
+      "https://cdn.jsdelivr.net/npm/@discord/embedded-app-sdk@2/+esm",
+      { headers: { "Accept": "application/javascript" } }
+    );
+    const text = await r.text();
+    res.setHeader("Content-Type", "application/javascript");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.send(text);
+  } catch(err) {
+    console.error("SDK proxy error:", err);
+    res.status(502).json({ error: "SDK_PROXY_FAILED" });
+  }
+});
+
 app.get("/api/config", (req, res) => {
   const clientId = process.env.CLIENT_ID || process.env.VITE_CLIENT_ID;
   if (!clientId) {
@@ -147,6 +166,19 @@ app.post("/api/token", async (req, res) => {
 app.get("/", (req, res) =>
   res.json({ status: "ok", users: userCount, uptime: process.uptime() })
 );
+
+// Keep-alive: Render free tier spins down after 15min of inactivity.
+// Ping ourselves every 10 minutes to stay warm.
+// Only runs if RENDER_EXTERNAL_URL is set (Render sets this automatically).
+const SELF_URL = process.env.RENDER_EXTERNAL_URL;
+if(SELF_URL){
+  setInterval(async()=>{
+    try{
+      await fetch(SELF_URL + "/");
+      console.log("Keep-alive ping sent");
+    }catch(e){ /* silent */ }
+  }, 10 * 60 * 1000); // every 10 minutes
+}
 
 // ════════════════════════════════════════════════════════════════
 //  SOCKET.IO
