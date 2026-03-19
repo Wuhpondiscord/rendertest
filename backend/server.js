@@ -24,7 +24,7 @@ const { Server } = require("socket.io");
 const crypto     = require("crypto");
 const cors       = require("cors");
 
-const fetch = (...args) => import("node-fetch").then(({ default: f }) => f(...args));
+// Node 18+ has fetch built-in — no node-fetch package needed
 
 const app    = express();
 const server = http.createServer(app);
