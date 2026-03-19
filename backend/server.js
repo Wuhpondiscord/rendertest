@@ -12,15 +12,14 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3001;
 
-// Global State
 let state = {
   bpm: 120,
   steps: 16,
   isPlaying: false,
   channels: [
-    { id: "c_" + crypto.randomUUID(), inst: "Kick - 808", note: "C2", pattern: Array(16).fill(false) },
-    { id: "c_" + crypto.randomUUID(), inst: "Snare - Tight", note: "C4", pattern: Array(16).fill(false) },
-    { id: "c_" + crypto.randomUUID(), inst: "Hat - Closed", note: "C4", pattern: Array(16).fill(false) }
+    { id: "c_" + crypto.randomUUID(), inst: "Kick - 808", note: "C2", vol: -2, pattern: Array(16).fill(false) },
+    { id: "c_" + crypto.randomUUID(), inst: "Snare - Trap", note: "C4", vol: -6, pattern: Array(16).fill(false) },
+    { id: "c_" + crypto.randomUUID(), inst: "Hat - Closed (Trap)", note: "C4", vol: -10, pattern: Array(16).fill(false) }
   ]
 };
 
@@ -31,22 +30,24 @@ app.get("/", (req, res) => res.send("Multiplayer DAW Server is running"));
 io.on("connection", (socket) => {
   userCount++;
   io.emit("userCount", userCount);
-
   socket.emit("initState", state);
 
+  // LIGHTWEIGHT UPDATE: Only syncs the specific note clicked
   socket.on("toggleStep", ({ channelId, stepIndex }) => {
     const channel = state.channels.find(c => c.id === channelId);
     if (channel) {
       channel.pattern[stepIndex] = !channel.pattern[stepIndex];
-      io.emit("stateUpdate", state);
+      // Broadcast just the step change, not the whole state
+      io.emit("stepToggled", { channelId, stepIndex, val: channel.pattern[stepIndex] });
     }
   });
 
   socket.on("addTrack", () => {
     state.channels.push({
       id: "c_" + crypto.randomUUID(),
-      inst: "Keys - Sine Piano", // Default new instrument
+      inst: "Keys - FM Piano",
       note: "C4",
+      vol: -8,
       pattern: Array(state.steps).fill(false)
     });
     io.emit("stateUpdate", state);
@@ -61,7 +62,7 @@ io.on("connection", (socket) => {
     const channel = state.channels.find(c => c.id === channelId);
     if (channel) {
       channel[key] = value;
-      io.emit("stateUpdate", state);
+      io.emit("stateUpdate", state); // Full update for instruments/notes
     }
   });
 
@@ -88,9 +89,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("clearGrid", () => {
-    state.channels.forEach(ch => {
-      ch.pattern = Array(state.steps).fill(false);
-    });
+    state.channels.forEach(ch => ch.pattern.fill(false));
     io.emit("stateUpdate", state);
   });
 
