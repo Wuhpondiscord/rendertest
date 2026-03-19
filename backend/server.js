@@ -2,7 +2,7 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const crypto = require("crypto");
-const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args)); // Ensure fetch works in all Node environments
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
 const app = express();
 const server = http.createServer(app);
@@ -17,7 +17,7 @@ const PORT = process.env.PORT || 3001;
  * IN-MEMORY STORAGE & INITIAL STATE
  */
 let savedProjects = {};
-let activeUsers = {}; // socket.id -> { userId, username }
+let activeUsers = {}; 
 
 let state = {
   projectId: "default",
@@ -32,17 +32,29 @@ let userCount = 0;
 
 app.use(express.json());
 
-// Health Check
-app.get("/", (req, res) => res.send("Discord DAW Server: Online"));
+// Health Check - Visit this URL in your browser to verify the server is up
+app.get("/", (req, res) => {
+  res.send({
+    status: "Online",
+    clientIdLoaded: !!process.env.VITE_CLIENT_ID,
+    clientSecretLoaded: !!process.env.DISCORD_CLIENT_SECRET
+  });
+});
 
 /**
  * DISCORD OAUTH2 TOKEN BRIDGE
- * This handles the secure exchange of the authorization code for an access token.
+ * FIXED: Added better error logging to debug "Stuck at Initializing"
  */
 app.post("/api/token", async (req, res) => {
   const { code } = req.body;
   
-  if (!process.env.DISCORD_CLIENT_SECRET) {
+  if (!code) {
+    console.error("❌ Auth Error: No code provided by frontend.");
+    return res.status(400).json({ error: "No code provided" });
+  }
+
+  if (!process.env.DISCORD_CLIENT_SECRET || !process.env.VITE_CLIENT_ID) {
+    console.error("❌ Config Error: Render Environment Variables are missing!");
     return res.status(500).json({ error: "Server missing environment variables" });
   }
 
@@ -50,7 +62,7 @@ app.post("/api/token", async (req, res) => {
     const response = await fetch(`https://discord.com/api/oauth2/token`, {
       method: "POST",
       body: new URLSearchParams({
-        client_id: process.env.VITE_CLIENT_ID || "YOUR_CLIENT_ID",
+        client_id: process.env.VITE_CLIENT_ID,
         client_secret: process.env.DISCORD_CLIENT_SECRET,
         grant_type: "authorization_code",
         code: code,
@@ -59,12 +71,17 @@ app.post("/api/token", async (req, res) => {
     });
 
     const data = await response.json();
-    if (data.error) throw new Error(data.error_description || data.error);
+
+    if (!response.ok) {
+      console.error("❌ Discord API Error:", data);
+      return res.status(response.status).json(data);
+    }
     
+    console.log("✅ Discord Auth Successful");
     res.send(data);
   } catch (err) {
-    console.error("Auth Bridge Error:", err.message);
-    res.status(500).json({ error: err.message });
+    console.error("❌ Auth Bridge Critical Failure:", err.message);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
@@ -75,34 +92,28 @@ io.on("connection", (socket) => {
   userCount++;
   activeUsers[socket.id] = { userId: null, username: "Guest" };
 
-  // Sync new user with current session
   io.emit("userCount", userCount);
   socket.emit("initState", state);
   socket.emit("projectList", Object.keys(savedProjects));
 
-  // --- USER HANDSHAKE ---
   socket.on("registerUser", ({ userId, username }) => {
     activeUsers[socket.id] = { userId, username };
-    console.log(`User Linked: ${username} (${userId})`);
+    console.log(`👤 User Joined: ${username} (${userId})`);
     io.emit("presenceUpdate", Object.values(activeUsers));
   });
 
-  // --- STEP SEQUENCER LOGIC ---
   socket.on("toggleStep", ({ channelId, stepIndex, val }) => {
     const channel = state.channels.find(c => c.id === channelId);
     const user = activeUsers[socket.id];
     
-    // Strict Ownership Check: Only the creator of the track can edit steps
     if (!channel || (channel.userId && channel.userId !== user.userId)) return;
 
     if (stepIndex >= 0 && stepIndex < state.steps) {
       channel.pattern[stepIndex] = val;
-      // Broadcast specifically to update specific UI buttons efficiently
       io.emit("stepToggled", { channelId, stepIndex, val });
     }
   });
 
-  // --- TRACK MANAGEMENT ---
   socket.on("addTrack", (userData) => {
     const userId = userData.userId || activeUsers[socket.id].userId;
     const username = userData.username || activeUsers[socket.id].username;
@@ -114,7 +125,7 @@ io.on("connection", (socket) => {
       inst: "Kick - 808 Trap",
       note: "C1",
       vol: -6,
-      speed: 2, // 1: Fast, 2: Normal, 4: Slow
+      speed: 2, 
       pattern: Array(state.steps).fill(false)
     };
     
@@ -125,29 +136,23 @@ io.on("connection", (socket) => {
   socket.on("removeTrack", (channelId) => {
     const channel = state.channels.find(c => c.id === channelId);
     const user = activeUsers[socket.id];
-
-    // Permissions: Only delete your own track
     if (!channel || (channel.userId && channel.userId !== user.userId)) return;
 
     state.channels = state.channels.filter(c => c.id !== channelId);
     io.emit("stateUpdate", state);
   });
 
-  // --- PARAMETER UPDATES ---
   socket.on("updateTrackParam", ({ channelId, key, value }) => {
     const channel = state.channels.find(c => c.id === channelId);
     const user = activeUsers[socket.id];
-
     if (!channel || (channel.userId && channel.userId !== user.userId)) return;
 
-    // Sanitize volume to prevent ear-blasting
     if (key === "vol") value = Math.max(-60, Math.min(12, value));
     
     channel[key] = value;
     io.emit("trackParamUpdated", { channelId, key, value });
   });
 
-  // --- GLOBAL TRANSPORT ---
   socket.on("setBPM", (newBpm) => {
     state.bpm = Math.max(40, Math.min(240, newBpm));
     io.emit("bpmUpdate", state.bpm);
@@ -166,7 +171,6 @@ io.on("connection", (socket) => {
     state.channels.forEach(ch => {
       const oldPattern = ch.pattern;
       ch.pattern = Array(newSteps).fill(false);
-      // Migrate old pattern to new grid without losing data
       for (let i = 0; i < Math.min(oldPattern.length, newSteps); i++) {
         ch.pattern[i] = oldPattern[i];
       }
@@ -179,43 +183,28 @@ io.on("connection", (socket) => {
     io.emit("stateUpdate", state);
   });
 
-  // --- PERSISTENCE ---
   socket.on("saveProject", (name) => {
     if (!name) return;
     state.projectName = name;
-    // Deep clone state to prevent reference issues
     savedProjects[name] = JSON.parse(JSON.stringify(state));
     io.emit("projectList", Object.keys(savedProjects));
-    console.log(`Project Saved: ${name}`);
   });
 
   socket.on("loadProject", (name) => {
     if (savedProjects[name]) {
       state = JSON.parse(JSON.stringify(savedProjects[name]));
-      state.isPlaying = false; // Always load in paused state
+      state.isPlaying = false;
       io.emit("stateUpdate", state);
-      console.log(`Project Loaded: ${name}`);
     }
   });
 
-  // --- DISCONNECT ---
   socket.on("disconnect", () => {
     userCount = Math.max(0, userCount - 1);
     delete activeUsers[socket.id];
     io.emit("userCount", userCount);
-    io.emit("presenceUpdate", Object.values(activeUsers));
   });
 });
 
-/**
- * RUN SERVER
- */
 server.listen(PORT, () => {
-  console.log(`
-  -----------------------------------------
-  🚀 DISCORD STUDIO PRO SERVER RUNNING
-  PORT: ${PORT}
-  ENVIRONMENT: ${process.env.NODE_ENV || 'development'}
-  -----------------------------------------
-  `);
+  console.log(`🚀 DAW Server Running on Port ${PORT}`);
 });
