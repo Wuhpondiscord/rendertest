@@ -30,7 +30,7 @@ const app    = express();
 const server = http.createServer(app);
 const PORT   = process.env.PORT || 3001;
 
-app.use(cors({ origin: "*" }));
+app.use(cors({ origin: "*" }));  // Discord's proxy rewrites the origin — wildcard required
 app.use(express.json());
 
 const io = new Server(server, {
