@@ -157,11 +157,12 @@ app.post("/api/token", async (req, res) => {
   const clientId     = process.env.CLIENT_ID || process.env.VITE_CLIENT_ID;
   const clientSecret = process.env.DISCORD_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
+    console.error("TOKEN: missing env vars. CLIENT_ID:", !!clientId, "SECRET:", !!clientSecret);
     return res.status(500).json({ error: "SERVER_MISCONFIGURED" });
   }
 
   try {
-    // Per Discord docs the token endpoint ONLY accepts application/x-www-form-urlencoded
+    console.log("TOKEN: exchanging code, clientId:", clientId.slice(0,8) + "...");
     const r = await fetch("https://discord.com/api/oauth2/token", {
       method  : "POST",
       headers : { "Content-Type": "application/x-www-form-urlencoded" },
@@ -173,12 +174,12 @@ app.post("/api/token", async (req, res) => {
       }),
     });
     const data = await r.json();
+    console.log("TOKEN: Discord responded status:", r.status, "has access_token:", !!data.access_token, "error:", data.error || "none");
     if (data.error) return res.status(400).json({ error: data.error_description || data.error });
-    // Return only access_token to client — never expose client_secret or refresh_token
     res.json({ access_token: data.access_token });
   } catch (err) {
-    console.error("Discord token exchange error:", err);
-    res.status(500).json({ error: "TOKEN_EXCHANGE_FAILED" });
+    console.error("TOKEN: fetch to Discord failed:", err.message, err.cause?.message || "");
+    res.status(500).json({ error: "TOKEN_EXCHANGE_FAILED", detail: err.message });
   }
 });
 
