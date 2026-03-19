@@ -53,7 +53,8 @@ function makeLayer(author, steps) {
     inst    : "Grand Piano",
     note    : "C4",
     vol     : -6,
-    bpmMult : 1,         // 0.5 | 1 | 2
+    bpmMult : 1,
+    fx      : { distortion:0, filterFreq:20000, filterType:"lowpass", delayWet:0, delayFeedback:.3, bitcrush:8 },
     pattern : Array(steps).fill(false),
   };
 }
@@ -176,10 +177,23 @@ io.on("connection", (socket) => {
     io.emit("state", clone(STATE));
   });
 
+  // ── DUPLICATE LAYER ───────────────────────────────────────────
+  socket.on("duplicateLayer", ({ beatId, layerId }) => {
+    const beat = STATE.beats.find(b => b.id === beatId);
+    if (!beat) return;
+    const src = beat.layers.find(l => l.id === layerId);
+    if (!src) return;
+    const copy = JSON.parse(JSON.stringify(src));
+    copy.id = "layer_" + uuid();
+    copy.label = (copy.label ? copy.label + " copy" : "copy");
+    beat.layers.push(copy);
+    io.emit("state", clone(STATE));
+  });
+
   // ── UPDATE LAYER PARAM ────────────────────────────────────────
-  // Allowed keys: inst, note, vol, bpmMult, label
+  // Allowed keys: inst, note, vol, bpmMult, label, fx
   socket.on("updateLayer", ({ beatId, layerId, key, value }) => {
-    const ALLOWED = ["inst", "note", "vol", "bpmMult", "label"];
+    const ALLOWED = ["inst", "note", "vol", "bpmMult", "label", "fx"];
     if (!ALLOWED.includes(key)) return;
 
     const layer = findLayer(STATE, beatId, layerId);
@@ -187,7 +201,7 @@ io.on("connection", (socket) => {
 
     // Basic sanitisation
     if (key === "vol")     value = Math.max(-60, Math.min(12, parseFloat(value) || 0));
-    if (key === "bpmMult") value = [0.5, 1, 2].includes(parseFloat(value)) ? parseFloat(value) : 1;
+    if (key === "bpmMult") value = Math.max(0.25, Math.min(4, parseFloat(value) || 1));
     if (key === "label")   value = String(value).slice(0, 32);
 
     layer[key] = value;
