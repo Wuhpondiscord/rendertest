@@ -938,13 +938,9 @@ async function boot(){
   // ── Step 1: wake up Render early ──────────────────────────────────────────
   try{ fetch(RENDER_URL + "/").catch(function(){}); }catch(e){}
 
-  // ── Step 2: In Discord, load SDK and call patchUrlMappings FIRST ────────
-  // This is the canonical fix from Discord's networking docs.
-  // patchUrlMappings rewrites browser's fetch, WebSocket, and XHR globals
-  // so that any connection to beat-backend-5nnu.onrender.com is transparently
-  // rewritten to go through Discord's /api proxy instead.
-  // This MUST happen before socket.io loads, because socket.io captures
-  // the WebSocket and XHR globals at load time.
+  // ── Step 2 + 6 combined: SDK init, patchUrlMappings, and auth ─────────────
+  // Do everything in one step to avoid initializing the SDK twice.
+  // SDK must be ready BEFORE socket.io loads so patchUrlMappings is active.
   if(IN_DISCORD){
     ovMsg("LOADING SDK...", 20);
     try{
@@ -952,28 +948,22 @@ async function boot(){
         .catch(function(){
           return import("https://cdn.jsdelivr.net/npm/@discord/embedded-app-sdk@2/+esm");
         });
+      console.log("SDK module loaded");
 
-      // patchUrlMappings rewrites:
-      //   https://beat-backend-5nnu.onrender.com/* → /api/*
-      //   wss://beat-backend-5nnu.onrender.com/*   → /api/*  (WebSocket)
-      // This matches our URL mapping: Prefix /api → beat-backend-5nnu.onrender.com
+      // patchUrlMappings patches fetch/WebSocket/XHR so socket.io connections
+      // to external URLs are rewritten through the Discord proxy.
       if(sdkModule.patchUrlMappings){
-        sdkModule.patchUrlMappings([{
-          prefix: "/api",
-          target: "beat-backend-5nnu.onrender.com",
-        }]);
+        sdkModule.patchUrlMappings([{ prefix: "/api", target: "beat-backend-5nnu.onrender.com" }]);
         console.log("patchUrlMappings applied");
       }
 
-      // Store SDK for later use in auth step
       window._sdkModule = sdkModule;
-      console.log("SDK loaded");
     }catch(e){
       console.warn("SDK load failed:", e.message);
     }
   }
 
-  // ── Step 3: load socket.io (after patchUrlMappings is active) ───────────
+  // ── Step 3: load socket.io ──────────────────────────────────────────────
   ovMsg("LOADING SOCKET.IO...", 35);
   await Promise.race([
     new Promise(function(res){
@@ -988,8 +978,6 @@ async function boot(){
   console.log("socket.io loaded:", typeof io !== "undefined" ? "yes" : "no");
 
   // ── Step 4: connect socket ──────────────────────────────────────────────
-  // Same origin always — page and server both on Render (or Discord's proxy of it).
-  // No URL needed; socket.io connects to the page's origin automatically.
   ovMsg("CONNECTING TO SERVER...", 50);
   if(typeof io !== "undefined"){
     try{
@@ -1008,27 +996,31 @@ async function boot(){
   var clientId = null;
   try{
     var r = await fetch(configUrl);
-    console.log("Config response status: " + r.status + " content-type: " + r.headers.get("content-type"));
+    console.log("Config response status: " + r.status + " type: " + r.headers.get("content-type"));
     var j = await r.json();
     clientId = j.clientId;
-    console.log("Config fetched. clientId:", clientId ? "ok" : "missing");
+    console.log("clientId:", clientId ? "ok" : "missing");
   }catch(e){ console.warn("Config fetch failed:", e.message); }
 
-  // ── Step 6: Discord SDK auth ────────────────────────────────────────────
+  // ── Step 6: Discord auth ────────────────────────────────────────────────
   if(IN_DISCORD && clientId){
     ovMsg("DISCORD AUTH...", 80);
     try{
       var sdkMod = window._sdkModule;
-      if(!sdkMod) throw new Error("SDK module not loaded");
+      if(!sdkMod) throw new Error("SDK not loaded");
       var DiscordSDK = sdkMod.DiscordSDK;
-      discordSdk = new DiscordSDK(clientId);
-      console.log("DiscordSDK created");
 
-      await Promise.race([
-        discordSdk.ready(),
-        new Promise(function(_,rej){ setTimeout(function(){ rej(new Error("SDK ready timeout")); }, 10000); })
-      ]);
-      console.log("Discord SDK ready");
+      // Create SDK instance ONCE and call ready() ONCE.
+      // Creating it twice causes a postMessage recursion stack overflow.
+      if(!discordSdk){
+        discordSdk = new DiscordSDK(clientId);
+        console.log("DiscordSDK instance created");
+        await Promise.race([
+          discordSdk.ready(),
+          new Promise(function(_,rej){ setTimeout(function(){ rej(new Error("SDK ready timeout")); }, 10000); })
+        ]);
+        console.log("Discord SDK ready");
+      }
 
       var authRes = await discordSdk.commands.authorize({
         client_id    : clientId,
@@ -1036,16 +1028,16 @@ async function boot(){
         prompt       : "none",
         scope        : ["identify"],
       });
-      var code = authRes.code;
       console.log("Got auth code");
 
       var tr = await fetch(API_BASE + "/token", {
         method : "POST",
         headers: { "Content-Type": "application/json" },
-        body   : JSON.stringify({ code: code }),
+        body   : JSON.stringify({ code: authRes.code }),
       });
       var tokenData = await tr.json();
-      if(!tokenData.access_token) throw new Error("No access_token — server returned: " + JSON.stringify(tokenData));
+      console.log("Token response:", JSON.stringify(tokenData).slice(0,80));
+      if(!tokenData.access_token) throw new Error("No access_token: " + JSON.stringify(tokenData));
 
       var auth = await discordSdk.commands.authenticate({ access_token: tokenData.access_token });
       if(!auth) throw new Error("authenticate() returned null");
