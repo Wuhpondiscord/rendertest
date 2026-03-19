@@ -938,25 +938,18 @@ async function boot(){
   // ── Step 1: wake up Render early ──────────────────────────────────────────
   try{ fetch(RENDER_URL + "/").catch(function(){}); }catch(e){}
 
-  // ── Step 2 + 6 combined: SDK init, patchUrlMappings, and auth ─────────────
-  // Do everything in one step to avoid initializing the SDK twice.
-  // SDK must be ready BEFORE socket.io loads so patchUrlMappings is active.
+  // ── Step 2: Load Discord SDK ───────────────────────────────────────────
+  // patchUrlMappings is NOT used — it patches window.postMessage which causes
+  // a stack overflow with the SDK's own internal messaging system.
+  // Since everything is served from Render (same origin), no URL patching needed.
   if(IN_DISCORD){
     ovMsg("LOADING SDK...", 20);
     try{
-      var sdkModule = await import(API_BASE + "/sdk")
+      var sdkModule = await import("/api/sdk")
         .catch(function(){
           return import("https://cdn.jsdelivr.net/npm/@discord/embedded-app-sdk@2/+esm");
         });
       console.log("SDK module loaded");
-
-      // patchUrlMappings patches fetch/WebSocket/XHR so socket.io connections
-      // to external URLs are rewritten through the Discord proxy.
-      if(sdkModule.patchUrlMappings){
-        sdkModule.patchUrlMappings([{ prefix: "/api", target: "beat-backend-5nnu.onrender.com" }]);
-        console.log("patchUrlMappings applied");
-      }
-
       window._sdkModule = sdkModule;
     }catch(e){
       console.warn("SDK load failed:", e.message);
