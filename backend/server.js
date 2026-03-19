@@ -1,22 +1,22 @@
 /**
- * Discord Studio Pro — Backend Server
- * ─────────────────────────────────────────────────────────────────
- * Features:
- *  - Real-time collaboration via Socket.IO
- *  - Discord OAuth2 token exchange
- *  - Multiple beat patterns per project
- *  - Per-track BPM multiplier + volume
- *  - Project save / load / rename (in-memory)
- *  - Per-socket user colors
- *  - Toast broadcast for collaborative feedback
- * ─────────────────────────────────────────────────────────────────
+ * Discord Studio Pro — Backend
+ * ════════════════════════════════════════════════════════════════
+ *
+ * Data model:
+ *   Project
+ *     └─ beats[]          (was "patterns")
+ *           └─ layers[]   (was "channels/tracks")
+ *                 └─ pattern[]  (step sequencer booleans)
+ *
  * Required env vars:
- *   CLIENT_ID             — Discord app client ID
- *   DISCORD_CLIENT_SECRET — Discord app client secret
+ *   CLIENT_ID              Discord application client ID
+ *   DISCORD_CLIENT_SECRET  Discord application client secret
  *
  * Optional:
- *   PORT                  — defaults to 3001
+ *   PORT                   defaults to 3001
  */
+
+"use strict";
 
 const express = require("express");
 const http    = require("http");
@@ -24,15 +24,14 @@ const { Server } = require("socket.io");
 const crypto  = require("crypto");
 const cors    = require("cors");
 
-// Dynamic import shim for node-fetch
-const fetch = (...args) =>
-  import("node-fetch").then(({ default: f }) => f(...args));
+// node-fetch v3 is ESM-only, so use dynamic import shim
+const fetch = (...args) => import("node-fetch").then(({ default: f }) => f(...args));
 
 const app    = express();
 const server = http.createServer(app);
 const PORT   = process.env.PORT || 3001;
 
-// ─── MIDDLEWARE ──────────────────────────────────────────────────
+// ── middleware ───────────────────────────────────────────────────
 app.use(cors({ origin: "*" }));
 app.use(express.json());
 
@@ -40,89 +39,85 @@ const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] },
 });
 
-// ─── HELPERS ─────────────────────────────────────────────────────
-function makeId() {
-  return crypto.randomUUID();
-}
+// ════════════════════════════════════════════════════════════════
+//  STATE HELPERS
+// ════════════════════════════════════════════════════════════════
+function uuid() { return crypto.randomUUID(); }
+function clone(x) { return JSON.parse(JSON.stringify(x)); }
 
-function makePattern(name, steps) {
+function makeLayer(author, steps) {
   return {
-    id      : "pat_" + makeId(),
-    name    : name || "Beat 1",
-    channels: [],
-  };
-}
-
-function makeTrack(authorName, steps) {
-  return {
-    id      : "track_" + makeId(),
-    author  : authorName || "Guest",
-    inst    : "Keys - Grand Piano",
+    id      : "layer_" + uuid(),
+    author  : author || "Guest",
+    label   : "",
+    inst    : "Grand Piano",
     note    : "C4",
     vol     : -6,
-    bpmMult : 1,   // 0.5 = half speed, 1 = normal, 2 = double
+    bpmMult : 1,         // 0.5 | 1 | 2
     pattern : Array(steps).fill(false),
   };
 }
 
-function cloneState(s) {
-  return JSON.parse(JSON.stringify(s));
+function makeBeat(name, steps) {
+  return {
+    id    : "beat_" + uuid(),
+    name  : (name || "Beat 1").slice(0, 48),
+    layers: [],
+  };
 }
 
-// ─── STATE ───────────────────────────────────────────────────────
-const initialPattern = makePattern("Beat 1", 16);
+// ── initial state ────────────────────────────────────────────────
+const firstBeat = makeBeat("Beat 1", 16);
 
-let state = {
-  projectName   : "Untitled Session",
-  bpm           : 120,
-  steps         : 16,
-  isPlaying     : false,
-  channels      : [],          // tracks in the ACTIVE pattern (kept in sync)
-  patterns      : [initialPattern],
-  activePattern : initialPattern.id,
+let STATE = {
+  projectName : "Untitled Session",
+  bpm         : 120,
+  steps       : 16,
+  isPlaying   : false,
+  beats       : [firstBeat],
+  activeBeat  : firstBeat.id,
 };
 
-let savedProjects = {};  // { name: clonedState }
-let userCount     = 0;
-let connectedUsers = {}; // { socketId: { username, color } }
+// Saved projects live here in memory.
+// For persistence across server restarts add a JSON file or DB.
+let SAVED = {};    // { name: cloned STATE }
 
-// Get the currently active pattern object from state
-function getActivePattern() {
-  return state.patterns.find(p => p.id === state.activePattern) || state.patterns[0];
+let userCount = 0;
+
+// ── accessors ────────────────────────────────────────────────────
+function getActiveBeat(st) {
+  return st.beats.find(b => b.id === st.activeBeat) || st.beats[0];
+}
+function findLayer(st, beatId, layerId) {
+  const beat = st.beats.find(b => b.id === beatId);
+  if (!beat) return null;
+  return beat.layers.find(l => l.id === layerId) || null;
 }
 
-// Sync state.channels ↔ active pattern channels (they reference the same array)
-function syncChannels() {
-  const pat = getActivePattern();
-  state.channels = pat.channels;
-}
-
-// ─── HTTP ROUTES ─────────────────────────────────────────────────
-
-// Discord client ID (safe to expose publicly)
+// ════════════════════════════════════════════════════════════════
+//  HTTP ROUTES
+// ════════════════════════════════════════════════════════════════
 app.get("/api/config", (req, res) => {
   const clientId = process.env.CLIENT_ID || process.env.VITE_CLIENT_ID;
   if (!clientId) {
-    console.error("CLIENT_ID env var is not set!");
-    return res.status(500).json({ error: "Server misconfiguration: CLIENT_ID missing" });
+    console.error("CLIENT_ID is not set in environment variables!");
+    return res.status(500).json({ error: "SERVER_MISCONFIGURED" });
   }
   res.json({ clientId });
 });
 
-// Discord OAuth2 token exchange
 app.post("/api/token", async (req, res) => {
   const { code } = req.body;
   if (!code) return res.status(400).json({ error: "Missing code" });
 
   const clientId     = process.env.CLIENT_ID || process.env.VITE_CLIENT_ID;
   const clientSecret = process.env.DISCORD_CLIENT_SECRET;
-
   if (!clientId || !clientSecret) {
-    return res.status(500).json({ error: "Server misconfiguration: OAuth credentials missing" });
+    return res.status(500).json({ error: "SERVER_MISCONFIGURED" });
   }
 
   try {
-    const response = await fetch("https://discord.com/api/oauth2/token", {
+    const r = await fetch("https://discord.com/api/oauth2/token", {
       method  : "POST",
       headers : { "Content-Type": "application/x-www-form-urlencoded" },
       body    : new URLSearchParams({
@@ -132,198 +127,195 @@ app.post("/api/token", async (req, res) => {
         code,
       }),
     });
-    const data = await response.json();
-    if (data.error) {
-      console.error("Discord token error:", data);
-      return res.status(400).json({ error: data.error_description || data.error });
-    }
+    const data = await r.json();
+    if (data.error) return res.status(400).json({ error: data.error_description || data.error });
     res.json(data);
   } catch (err) {
-    console.error("Discord Auth Error:", err);
-    res.status(500).json({ error: "Failed to exchange token with Discord" });
+    console.error("Discord token exchange error:", err);
+    res.status(500).json({ error: "TOKEN_EXCHANGE_FAILED" });
   }
 });
 
 app.get("/", (req, res) =>
-  res.send(`<pre>Discord Studio Pro — Server Online (port ${PORT})\nUsers: ${userCount}</pre>`)
+  res.send(`<pre>Discord Studio Pro – Server running on port ${PORT}\nUsers online: ${userCount}</pre>`)
 );
 
-// ─── SOCKET.IO ───────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════
+//  SOCKET.IO
+// ════════════════════════════════════════════════════════════════
 io.on("connection", (socket) => {
   userCount++;
-  connectedUsers[socket.id] = { username: "Guest" };
   io.emit("userCount", userCount);
 
-  // Send full state to new user
-  syncChannels();
-  socket.emit("initState", cloneState(state));
-  socket.emit("projectList", Object.keys(savedProjects));
+  // Send current state + saved project list to the new client
+  socket.emit("state", clone(STATE));
+  socket.emit("projectList", Object.keys(SAVED));
 
-  // ── STEP TOGGLE ──────────────────────────────────────────────
-  socket.on("toggleStep", ({ channelId, stepIndex, val }) => {
-    const pat = getActivePattern();
-    const ch  = pat.channels.find(c => c.id === channelId);
-    if (!ch || stepIndex < 0 || stepIndex >= ch.pattern.length) return;
-    ch.pattern[stepIndex] = val;
-    syncChannels();
-    socket.broadcast.emit("stepToggled", { channelId, stepIndex, val });
+  // ── STEP TOGGLE ───────────────────────────────────────────────
+  socket.on("toggleStep", ({ beatId, layerId, stepIndex, val }) => {
+    const layer = findLayer(STATE, beatId, layerId);
+    if (!layer || stepIndex < 0 || stepIndex >= layer.pattern.length) return;
+    layer.pattern[stepIndex] = !!val;
+    // Surgical broadcast — avoids full UI rebuild on other clients
+    socket.broadcast.emit("stepToggled", { beatId, layerId, stepIndex, val: !!val });
   });
 
-  // ── ADD TRACK ────────────────────────────────────────────────
-  socket.on("addTrack", (authorName) => {
-    const pat   = getActivePattern();
-    const track = makeTrack(authorName, state.steps);
-    pat.channels.push(track);
-    syncChannels();
-    io.emit("stateUpdate", cloneState(state));
+  // ── ADD LAYER ─────────────────────────────────────────────────
+  socket.on("addLayer", ({ beatId, author }) => {
+    const beat = STATE.beats.find(b => b.id === beatId);
+    if (!beat) return;
+    beat.layers.push(makeLayer(author, STATE.steps));
+    io.emit("state", clone(STATE));
   });
 
-  // ── REMOVE TRACK ─────────────────────────────────────────────
-  socket.on("removeTrack", (channelId) => {
-    const pat = getActivePattern();
-    pat.channels = pat.channels.filter(c => c.id !== channelId);
-    syncChannels();
-    io.emit("stateUpdate", cloneState(state));
+  // ── REMOVE LAYER ─────────────────────────────────────────────
+  socket.on("removeLayer", ({ beatId, layerId }) => {
+    const beat = STATE.beats.find(b => b.id === beatId);
+    if (!beat) return;
+    beat.layers = beat.layers.filter(l => l.id !== layerId);
+    io.emit("state", clone(STATE));
   });
 
-  // ── UPDATE TRACK PARAM ───────────────────────────────────────
-  // Handles: inst, note, vol, bpmMult
-  socket.on("updateTrackParam", ({ channelId, key, value }) => {
-    const pat = getActivePattern();
-    const ch  = pat.channels.find(c => c.id === channelId);
-    if (!ch) return;
+  // ── UPDATE LAYER PARAM ────────────────────────────────────────
+  // Allowed keys: inst, note, vol, bpmMult, label
+  socket.on("updateLayer", ({ beatId, layerId, key, value }) => {
+    const ALLOWED = ["inst", "note", "vol", "bpmMult", "label"];
+    if (!ALLOWED.includes(key)) return;
 
-    const allowed = ["inst", "note", "vol", "bpmMult"];
-    if (!allowed.includes(key)) return;
+    const layer = findLayer(STATE, beatId, layerId);
+    if (!layer) return;
 
-    ch[key] = value;
-    syncChannels();
-    // Broadcast delta to all other clients (avoids full grid rebuild for vol)
-    socket.broadcast.emit("trackParamUpdated", { channelId, key, value });
+    // Basic sanitisation
+    if (key === "vol")     value = Math.max(-60, Math.min(12, parseFloat(value) || 0));
+    if (key === "bpmMult") value = [0.5, 1, 2].includes(parseFloat(value)) ? parseFloat(value) : 1;
+    if (key === "label")   value = String(value).slice(0, 32);
+
+    layer[key] = value;
+
+    // For vol, broadcast a delta (not a full state) so volume changes are smooth
+    if (key === "vol") {
+      socket.broadcast.emit("stepToggled", {}); // no-op trick; use dedicated event:
+      // actually send a targeted update:
+      socket.broadcast.emit("layerParamUpdate", { beatId, layerId, key, value });
+    } else {
+      // For inst/note/label/bpmMult a full state sync keeps everyone in check
+      io.emit("state", clone(STATE));
+    }
   });
 
-  // ── TRANSPORT ────────────────────────────────────────────────
+  // ── TRANSPORT ─────────────────────────────────────────────────
   socket.on("setBPM", (bpm) => {
-    const v = Math.max(40, Math.min(220, Number(bpm)));
-    state.bpm = v;
+    const v = Math.max(40, Math.min(220, Number(bpm) || 120));
+    STATE.bpm = v;
     io.emit("bpmUpdate", v);
   });
 
-  socket.on("togglePlay", (playing) => {
-    state.isPlaying = !!playing;
-    io.emit("playUpdate", state.isPlaying);
+  socket.on("togglePlay", (p) => {
+    STATE.isPlaying = !!p;
+    io.emit("playUpdate", STATE.isPlaying);
   });
 
-  socket.on("changeSteps", (newSteps) => {
-    const n = [16, 32, 64].includes(newSteps) ? newSteps : 16;
-    state.steps = n;
-    // Resize patterns for all patterns
-    state.patterns.forEach(pat => {
-      pat.channels.forEach(ch => {
-        const fresh = Array(n).fill(false);
-        for (let i = 0; i < Math.min(ch.pattern.length, n); i++) {
-          fresh[i] = ch.pattern[i];
+  socket.on("changeSteps", (n) => {
+    const steps = [16, 32, 64].includes(Number(n)) ? Number(n) : 16;
+    STATE.steps = steps;
+    // Resize every layer in every beat
+    STATE.beats.forEach(beat => {
+      beat.layers.forEach(layer => {
+        const fresh = Array(steps).fill(false);
+        for (let i = 0; i < Math.min(layer.pattern.length, steps); i++) {
+          fresh[i] = layer.pattern[i];
         }
-        ch.pattern = fresh;
+        layer.pattern = fresh;
       });
     });
-    syncChannels();
-    io.emit("stateUpdate", cloneState(state));
+    io.emit("state", clone(STATE));
   });
 
-  socket.on("clearGrid", () => {
-    const pat = getActivePattern();
-    pat.channels.forEach(ch => ch.pattern.fill(false));
-    syncChannels();
-    io.emit("stateUpdate", cloneState(state));
+  socket.on("clearGrid", (beatId) => {
+    const beat = STATE.beats.find(b => b.id === beatId) || getActiveBeat(STATE);
+    if (!beat) return;
+    beat.layers.forEach(l => l.pattern.fill(false));
+    io.emit("state", clone(STATE));
   });
 
-  // ── PATTERNS ─────────────────────────────────────────────────
-  socket.on("addPattern", (name) => {
-    const pat = makePattern(name || `Beat ${state.patterns.length + 1}`, state.steps);
-    state.patterns.push(pat);
-    state.activePattern = pat.id;
-    syncChannels();
-    io.emit("stateUpdate", cloneState(state));
-    io.emit("toast", `Pattern "${pat.name}" created`);
+  // ── BEATS ─────────────────────────────────────────────────────
+  socket.on("addBeat", (name) => {
+    const beat = makeBeat(name, STATE.steps);
+    STATE.beats.push(beat);
+    STATE.activeBeat = beat.id;
+    io.emit("state", clone(STATE));
+    io.emit("toast", `Beat "${beat.name}" added`);
   });
 
-  socket.on("switchPattern", (patternId) => {
-    const pat = state.patterns.find(p => p.id === patternId);
-    if (!pat) return;
-    state.activePattern = patternId;
-    syncChannels();
-    io.emit("stateUpdate", cloneState(state));
+  socket.on("switchBeat", (beatId) => {
+    if (!STATE.beats.find(b => b.id === beatId)) return;
+    STATE.activeBeat = beatId;
+    io.emit("state", clone(STATE));
   });
 
-  socket.on("renamePattern", ({ patternId, name }) => {
-    const pat = state.patterns.find(p => p.id === patternId);
-    if (!pat || !name) return;
-    pat.name = name.slice(0, 32);
-    syncChannels();
-    io.emit("stateUpdate", cloneState(state));
+  socket.on("renameBeat", ({ beatId, name }) => {
+    const beat = STATE.beats.find(b => b.id === beatId);
+    if (!beat || !name) return;
+    beat.name = String(name).slice(0, 48);
+    io.emit("state", clone(STATE));
   });
 
-  socket.on("deletePattern", (patternId) => {
-    if (state.patterns.length <= 1) return; // always keep at least one
-    state.patterns = state.patterns.filter(p => p.id !== patternId);
-    if (state.activePattern === patternId) {
-      state.activePattern = state.patterns[0].id;
-    }
-    syncChannels();
-    io.emit("stateUpdate", cloneState(state));
+  socket.on("deleteBeat", (beatId) => {
+    if (STATE.beats.length <= 1) return; // always keep at least one
+    STATE.beats = STATE.beats.filter(b => b.id !== beatId);
+    if (STATE.activeBeat === beatId) STATE.activeBeat = STATE.beats[0].id;
+    io.emit("state", clone(STATE));
   });
 
-  // ── PROJECTS ─────────────────────────────────────────────────
+  // ── PROJECTS ──────────────────────────────────────────────────
   socket.on("saveProject", (name) => {
     if (!name || typeof name !== "string") return;
-    const safeName = name.trim().slice(0, 64);
-    state.projectName = safeName;
-    savedProjects[safeName] = cloneState(state);
-    io.emit("projectList", Object.keys(savedProjects));
-    io.emit("stateUpdate", cloneState(state));
-    io.emit("toast", `Project "${safeName}" saved`);
+    const safe = name.trim().slice(0, 64);
+    if (!safe) return;
+    STATE.projectName = safe;
+    SAVED[safe] = clone(STATE);
+    io.emit("projectList", Object.keys(SAVED));
+    io.emit("state", clone(STATE));
+    io.emit("toast", `Saved "${safe}"`, "ok");
   });
 
   socket.on("renameProject", (name) => {
     if (!name || typeof name !== "string") return;
-    state.projectName = name.trim().slice(0, 64);
-    syncChannels();
-    io.emit("stateUpdate", cloneState(state));
+    STATE.projectName = name.trim().slice(0, 64);
+    io.emit("state", clone(STATE));
   });
 
   socket.on("loadProject", (name) => {
-    if (!savedProjects[name]) return;
-    state = cloneState(savedProjects[name]);
-    state.isPlaying = false;
-    syncChannels();
-    io.emit("stateUpdate", cloneState(state));
-    io.emit("toast", `Loaded "${name}"`);
+    if (!SAVED[name]) return;
+    STATE = clone(SAVED[name]);
+    STATE.isPlaying = false;  // don't auto-play on load
+    io.emit("state", clone(STATE));
+    io.emit("projectList", Object.keys(SAVED));
+    io.emit("toast", `Loaded "${name}"`, "ok");
   });
 
-  // ── DISCONNECT ───────────────────────────────────────────────
+  // ── DISCONNECT ────────────────────────────────────────────────
   socket.on("disconnect", () => {
     userCount = Math.max(0, userCount - 1);
-    delete connectedUsers[socket.id];
     io.emit("userCount", userCount);
   });
 });
 
-// ─── START ───────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════
+//  START
+// ════════════════════════════════════════════════════════════════
 server.listen(PORT, () => {
   console.log(`
-╔═══════════════════════════════════════╗
-║      Discord Studio Pro — Server      ║
-╠═══════════════════════════════════════╣
-║  URL  : http://localhost:${PORT}          ║
-║  Mode : ${process.env.NODE_ENV || "development"}                    ║
-╚═══════════════════════════════════════╝
+╔══════════════════════════════════════════╗
+║      Discord Studio Pro  —  Server       ║
+╠══════════════════════════════════════════╣
+║  Port : ${PORT}                              ║
+║  Mode : ${(process.env.NODE_ENV || "development").padEnd(32)} ║
+╚══════════════════════════════════════════╝
   `);
 
-  if (!process.env.CLIENT_ID && !process.env.VITE_CLIENT_ID) {
-    console.warn("⚠  WARNING: CLIENT_ID env var is not set. Discord auth will fail.");
-  }
-  if (!process.env.DISCORD_CLIENT_SECRET) {
-    console.warn("⚠  WARNING: DISCORD_CLIENT_SECRET env var is not set. Discord auth will fail.");
-  }
+  if (!process.env.CLIENT_ID && !process.env.VITE_CLIENT_ID)
+    console.warn("⚠  WARNING: CLIENT_ID not set — Discord OAuth will fail.");
+  if (!process.env.DISCORD_CLIENT_SECRET)
+    console.warn("⚠  WARNING: DISCORD_CLIENT_SECRET not set — Discord OAuth will fail.");
 });
