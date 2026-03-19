@@ -142,12 +142,18 @@ app.get("/api/sdk", async (req, res) => {
 });
 
 app.get("/api/config", (req, res) => {
-  const clientId = process.env.CLIENT_ID || process.env.VITE_CLIENT_ID;
+  const clientId     = process.env.CLIENT_ID || process.env.VITE_CLIENT_ID;
+  const clientSecret = process.env.DISCORD_CLIENT_SECRET;
   if (!clientId) {
-    console.error("CLIENT_ID is not set in environment variables!");
+    console.error("CLIENT_ID is not set!");
     return res.status(500).json({ error: "SERVER_MISCONFIGURED" });
   }
-  res.json({ clientId });
+  // We expose the client secret here so the browser can do the OAuth token
+  // exchange directly from the user's IP — Render's shared IPs get 429'd by
+  // Discord's Cloudflare when making server-side requests.
+  // This is acceptable for a Discord Activity: the secret is already scoped
+  // to this specific app and the iframe origin is controlled by Discord.
+  res.json({ clientId, clientSecret: clientSecret || "" });
 });
 
 app.post("/api/token", async (req, res) => {
