@@ -938,17 +938,22 @@ async function boot(){
   // ── Step 1: wake up Render early ──────────────────────────────────────────
   try{ fetch(RENDER_URL + "/").catch(function(){}); }catch(e){}
 
-  // ── Step 2: Load Discord SDK via script tag (not dynamic import) ──────────
-  // Dynamic import() of the SDK causes postMessage stack overflow because the
-  // ESM build sets up recursive message listeners on import.
-  // Script tag loads the UMD build which only runs when you explicitly call it.
+  // ── Step 2: Load Discord SDK via script tag ────────────────────────────
   if(IN_DISCORD){
     ovMsg("LOADING SDK...", 20);
     await Promise.race([
       new Promise(function(res){
         var s = document.createElement("script");
-        s.src = "https://cdn.jsdelivr.net/npm/@discord/embedded-app-sdk@2/dist/index.js";
-        s.onload = function(){ console.log("SDK script loaded, DiscordSDK:", typeof window.DiscordSDK); res(); };
+        // Use v1 UMD build — v2 has a postMessage recursion bug in script-tag usage
+        s.src = "https://cdn.jsdelivr.net/npm/@discord/embedded-app-sdk@1/dist/index.js";
+        s.onload = function(){
+          // UMD build exports as window.DiscordSDK or window.EmbeddedAppSdk
+          var cls = (window.DiscordSDK && (window.DiscordSDK.DiscordSDK || window.DiscordSDK))
+                 || (window.EmbeddedAppSdk && window.EmbeddedAppSdk.DiscordSDK);
+          console.log("SDK script loaded, class found:", typeof cls);
+          window._SDKClass = cls;
+          res();
+        };
         s.onerror = function(){ console.warn("SDK script load failed"); res(); };
         document.head.appendChild(s);
       }),
@@ -987,23 +992,23 @@ async function boot(){
   var configUrl = API_BASE + "/config";
   console.log("Fetching config from: " + configUrl);
   var clientId = null;
+  var clientSecret = null;
   try{
     var r = await fetch(configUrl);
     console.log("Config status:", r.status, "type:", r.headers.get("content-type"));
     var j = await r.json();
-    clientId = j.clientId;
-    console.log("clientId:", clientId ? "ok" : "missing");
+    clientId     = j.clientId;
+    clientSecret = j.clientSecret;
+    console.log("clientId:", clientId ? "ok" : "missing", "secret:", clientSecret ? "ok" : "missing");
   }catch(e){ console.warn("Config fetch failed:", e.message); }
 
   // ── Step 6: Discord auth ────────────────────────────────────────────────
   if(IN_DISCORD && clientId){
     ovMsg("DISCORD AUTH...", 80);
     try{
-      // Use window.DiscordSDK from the UMD script tag (not dynamic import)
-      var SDKClass = (window.DiscordSDK && window.DiscordSDK.DiscordSDK)
-                   || window.DiscordSDK
-                   || (window.EmbeddedAppSDK && window.EmbeddedAppSDK.DiscordSDK);
-      if(!SDKClass) throw new Error("DiscordSDK class not found on window");
+      // Use SDK class set by the script tag onload handler
+      var SDKClass = window._SDKClass;
+      if(!SDKClass) throw new Error("DiscordSDK class not found — script may have failed to load");
       console.log("SDKClass found:", typeof SDKClass);
 
       if(!discordSdk){
@@ -1022,17 +1027,22 @@ async function boot(){
       });
       console.log("Got auth code");
 
-      // Exchange code for token — done BROWSER-SIDE directly to discord.com
-      // Render's free tier blocks outbound HTTPS to discord.com from the server.
-      // The client secret is on the server, so we still proxy through /api/token
-      // but now log exactly what discord.com responds with.
-      var tr = await fetch(API_BASE + "/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: authRes.code }),
+      // Exchange code DIRECTLY from browser to discord.com.
+      // Render's shared free-tier IPs get 429 rate-limited by Discord's Cloudflare
+      // when the server makes this request. The browser uses the user's own IP
+      // which is never rate-limited.
+      var tokenRes = await fetch("https://discord.com/api/oauth2/token", {
+        method : "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body   : new URLSearchParams({
+          client_id    : clientId,
+          client_secret: clientSecret,
+          grant_type   : "authorization_code",
+          code         : authRes.code,
+        }),
       });
-      var tokenData = await tr.json();
-      console.log("Token response:", JSON.stringify(tokenData).slice(0, 100));
+      var tokenData = await tokenRes.json();
+      console.log("Token exchange status:", tokenRes.status, "has token:", !!tokenData.access_token);
       if(!tokenData.access_token) throw new Error("No access_token: " + JSON.stringify(tokenData));
 
       var auth = await discordSdk.commands.authenticate({ access_token: tokenData.access_token });
