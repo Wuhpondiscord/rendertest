@@ -41,7 +41,7 @@
     .delete-btn { background: transparent; color: var(--danger); padding: 5px 10px; font-size: 16px; }
     .delete-btn:hover { background: rgba(243, 139, 168, 0.2); }
     
-    .inst-select { width: 180px; font-size: 11px; padding: 6px; }
+    .inst-select { width: 190px; font-size: 11px; padding: 6px; }
     .note-select { width: 60px; font-size: 11px; padding: 6px; }
     .vol-slider { width: 60px; height: 4px; cursor: pointer; }
 
@@ -56,8 +56,8 @@
 <body>
 
 <div id="start-overlay" onclick="initAudio()">
-  <h1>🎵 Discord Studio PRO</h1>
-  <p>Click anywhere to load the 100+ Synth Library</p>
+  <h1>🎵 Discord Studio ULTRA</h1>
+  <p>Click anywhere to load the 150+ Synth Engine</p>
 </div>
 
 <div class="transport">
@@ -95,88 +95,153 @@ let buttons = {}; let synthInstances = {};
 let state = { bpm: 120, steps: 16, channels: [] };
 const NOTES = ["C1","D1","E1","F1","G1","A1","B1", "C2","D2","E2","F2","G2","A2","B2", "C3","D3","E3","F3","G3","A3","B3", "C4","D4","E4","F4","G4","A4","B4", "C5","D5","E5","F5","G5","A5","B5", "C6","D6","E6","F6","G6","A6","B6"];
 
-// --- 100+ PRESET MEGA-LIBRARY ---
+// --- 150+ SYNTH FACTORY ---
+// Helpers for cleaner code
 const p = (type, opts) => new Tone.PolySynth(type, opts);
+const m = (opts) => new Tone.MembraneSynth(opts);
+const n = (opts) => new Tone.NoiseSynth(opts);
+const met = (opts) => new Tone.MetalSynth(opts);
+
 const SYNTH_LIBRARY = {
-  "🥁 DRUMS - Kicks": {
-    "Kick - Trap 808": () => new Tone.MembraneSynth({ pitchDecay: 0.005, octaves: 2, envelope: { attack: 0.01, decay: 0.8, sustain: 0.1, release: 1 } }),
-    "Kick - Deep Sub": () => new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 2, envelope: { attack: 0.01, decay: 0.5 } }),
-    "Kick - House Punch": () => new Tone.MembraneSynth({ pitchDecay: 0.1, octaves: 6, envelope: { attack: 0.001, decay: 0.2, sustain: 0 } }),
-    "Kick - Lo-Fi Thump": () => new Tone.MembraneSynth({ pitchDecay: 0.08, octaves: 4, envelope: { attack: 0.05, decay: 0.3 } }),
-    "Kick - Hardstyle": () => new Tone.MembraneSynth({ pitchDecay: 0.2, octaves: 10, envelope: { attack: 0.001, decay: 0.4 } }),
+  "🥁 DRUMS: Kicks": {
+    "Kick - 808 Trap": () => m({ pitchDecay: 0.005, octaves: 2, envelope: { attack: 0.01, decay: 0.8, sustain: 0.1, release: 1 } }),
+    "Kick - 808 Short": () => m({ pitchDecay: 0.01, octaves: 3, envelope: { attack: 0.01, decay: 0.3 } }),
+    "Kick - 808 Distorted": () => m({ pitchDecay: 0.01, octaves: 2, envelope: { attack: 0.01, decay: 0.6 } }),
+    "Kick - Sub Deep": () => m({ pitchDecay: 0.05, octaves: 2, envelope: { attack: 0.01, decay: 0.5 } }),
+    "Kick - House Punch": () => m({ pitchDecay: 0.1, octaves: 6, envelope: { attack: 0.001, decay: 0.2, sustain: 0 } }),
+    "Kick - Techno Thump": () => m({ pitchDecay: 0.08, octaves: 5, envelope: { attack: 0.01, decay: 0.4 } }),
+    "Kick - Hardstyle": () => m({ pitchDecay: 0.2, octaves: 10, envelope: { attack: 0.001, decay: 0.4 } }),
+    "Kick - Lo-Fi": () => m({ pitchDecay: 0.03, octaves: 3, envelope: { attack: 0.05, decay: 0.3 } }),
+    "Kick - Acoustic Body": () => m({ pitchDecay: 0.05, octaves: 4, envelope: { attack: 0.01, decay: 0.3 } }),
+    "Kick - Laser Zap": () => m({ pitchDecay: 0.1, octaves: 8, envelope: { attack: 0.001, decay: 0.1 } }),
   },
-  "🥁 DRUMS - Snares & Claps": {
-    "Snare - Trap Snappy": () => new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.001, decay: 0.1, sustain: 0 } }),
-    "Snare - Acoustic": () => new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.005, decay: 0.2, sustain: 0 } }),
-    "Snare - Lo-Fi": () => new Tone.NoiseSynth({ noise: { type: 'brown' }, envelope: { attack: 0.02, decay: 0.3, sustain: 0 } }),
-    "Clap - Basic": () => new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.3, sustain: 0 } }),
-    "Clap - Wide Reverb": () => new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.01, decay: 0.6, sustain: 0 } }),
+  "🥁 DRUMS: Snares & Claps": {
+    "Snare - Trap Tight": () => n({ noise: { type: 'pink' }, envelope: { attack: 0.001, decay: 0.1, sustain: 0 } }),
+    "Snare - Trap Wide": () => n({ noise: { type: 'pink' }, envelope: { attack: 0.005, decay: 0.2, sustain: 0 } }),
+    "Snare - Acoustic Loose": () => n({ noise: { type: 'white' }, envelope: { attack: 0.005, decay: 0.25, sustain: 0 } }),
+    "Snare - Lo-Fi Boxy": () => n({ noise: { type: 'brown' }, envelope: { attack: 0.02, decay: 0.3, sustain: 0 } }),
+    "Snare - Dubstep Slap": () => n({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.4, sustain: 0 } }),
+    "Snare - Rimshot": () => m({ pitchDecay: 0.01, octaves: 2, envelope: { attack: 0.001, decay: 0.05 } }),
+    "Clap - Basic": () => n({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.25, sustain: 0 } }),
+    "Clap - Wide Reverb": () => n({ noise: { type: 'pink' }, envelope: { attack: 0.01, decay: 0.6, sustain: 0 } }),
+    "Clap - Synth Snap": () => n({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.1, sustain: 0 } }),
   },
-  "🥁 DRUMS - Cymbals": {
-    "Hat - Trap Closed": () => new Tone.MetalSynth({ frequency: 250, envelope: { attack: 0.001, decay: 0.05, release: 0.01 }, harmonicity: 5.1, resonance: 4000 }),
-    "Hat - Acoustic Closed": () => new Tone.MetalSynth({ frequency: 400, envelope: { attack: 0.001, decay: 0.1 }, harmonicity: 5.1, resonance: 8000 }),
-    "Hat - Open": () => new Tone.MetalSynth({ frequency: 200, envelope: { attack: 0.001, decay: 0.4, release: 0.1 }, harmonicity: 5.1, resonance: 4000 }),
-    "Cymbal - Ride": () => new Tone.MetalSynth({ frequency: 500, envelope: { attack: 0.001, decay: 1.0 }, harmonicity: 6.1, resonance: 6000 }),
-    "Cymbal - Crash": () => new Tone.MetalSynth({ frequency: 300, envelope: { attack: 0.001, decay: 1.5, release: 0.5 }, harmonicity: 4.1, resonance: 4000 }),
+  "🥁 DRUMS: Hats & Cymbals": {
+    "Hat - Trap Closed": () => met({ frequency: 250, envelope: { attack: 0.001, decay: 0.05, release: 0.01 }, harmonicity: 5.1, resonance: 4000 }),
+    "Hat - Trap Open": () => met({ frequency: 200, envelope: { attack: 0.001, decay: 0.4, release: 0.1 }, harmonicity: 5.1, resonance: 4000 }),
+    "Hat - Acoustic Closed": () => met({ frequency: 400, envelope: { attack: 0.001, decay: 0.1 }, harmonicity: 5.1, resonance: 8000 }),
+    "Hat - Acoustic Open": () => met({ frequency: 400, envelope: { attack: 0.001, decay: 0.6 }, harmonicity: 5.1, resonance: 8000 }),
+    "Hat - Lo-Fi Closed": () => n({ noise: { type: 'brown' }, envelope: { attack: 0.001, decay: 0.05 } }),
+    "Cymbal - Ride": () => met({ frequency: 500, envelope: { attack: 0.001, decay: 1.0 }, harmonicity: 6.1, resonance: 6000 }),
+    "Cymbal - Crash": () => met({ frequency: 300, envelope: { attack: 0.001, decay: 1.5, release: 0.5 }, harmonicity: 4.1, resonance: 4000 }),
+    "Cymbal - Splash": () => met({ frequency: 450, envelope: { attack: 0.001, decay: 0.8 }, harmonicity: 5.5, resonance: 5000 }),
+    "Cymbal - China": () => met({ frequency: 200, envelope: { attack: 0.001, decay: 1.2 }, harmonicity: 3.1, resonance: 3000 }),
   },
-  "🪘 DRUMS - Percussion": {
-    "Perc - Low Tom": () => new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 2 }),
-    "Perc - Mid Tom": () => new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 3 }),
-    "Perc - Hi Tom": () => new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 4 }),
-    "Perc - Cowbell": () => new Tone.FMSynth({ harmonicity: 1.2, modulationIndex: 2.5, oscillator: { type: "square" }, envelope: { attack: 0.001, decay: 0.2 } }),
-    "Perc - Woodblock": () => new Tone.MembraneSynth({ pitchDecay: 0.01, octaves: 1, envelope: { attack: 0.001, decay: 0.1 } }),
-    "Perc - Shaker": () => new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.05, decay: 0.05 } }),
-    "Perc - Bongo Hi": () => new Tone.MembraneSynth({ pitchDecay: 0.01, octaves: 2, envelope: { attack: 0.005, decay: 0.1 } }),
+  "🪘 PERCUSSION": {
+    "Perc - Tom High": () => m({ pitchDecay: 0.05, octaves: 4 }),
+    "Perc - Tom Mid": () => m({ pitchDecay: 0.05, octaves: 3 }),
+    "Perc - Tom Low": () => m({ pitchDecay: 0.05, octaves: 2 }),
+    "Perc - Tom Floor": () => m({ pitchDecay: 0.02, octaves: 1.5 }),
+    "Perc - Synth Tom High": () => m({ pitchDecay: 0.1, octaves: 6, envelope: { decay: 0.2 } }),
+    "Perc - Synth Tom Low": () => m({ pitchDecay: 0.1, octaves: 3, envelope: { decay: 0.4 } }),
+    "Perc - 808 Cowbell": () => new Tone.FMSynth({ harmonicity: 1.2, modulationIndex: 2.5, oscillator: { type: "square" }, envelope: { attack: 0.001, decay: 0.2 } }),
+    "Perc - Latin Cowbell": () => new Tone.FMSynth({ harmonicity: 1.5, modulationIndex: 1, oscillator: { type: "triangle" }, envelope: { attack: 0.001, decay: 0.3 } }),
+    "Perc - Woodblock": () => m({ pitchDecay: 0.01, octaves: 1, envelope: { attack: 0.001, decay: 0.1 } }),
+    "Perc - Clave": () => m({ pitchDecay: 0.01, octaves: 2, envelope: { attack: 0.001, decay: 0.05 } }),
+    "Perc - Shaker": () => n({ noise: { type: 'white' }, envelope: { attack: 0.05, decay: 0.05 } }),
+    "Perc - Tambourine": () => met({ frequency: 600, envelope: { attack: 0.01, decay: 0.2 }, harmonicity: 8 }),
+    "Perc - Bongo High": () => m({ pitchDecay: 0.01, octaves: 2, envelope: { attack: 0.005, decay: 0.15 } }),
+    "Perc - Bongo Low": () => m({ pitchDecay: 0.01, octaves: 1.5, envelope: { attack: 0.005, decay: 0.2 } }),
+    "Perc - Conga": () => m({ pitchDecay: 0.02, octaves: 1.2, envelope: { attack: 0.01, decay: 0.3 } }),
+    "Perc - Triangle": () => met({ frequency: 800, envelope: { attack: 0.001, decay: 0.8 }, harmonicity: 10 }),
   },
   "🎸 BASSES": {
     "Bass - 808 Glide": () => p(Tone.Synth, { oscillator: { type: "sine" }, envelope: { attack: 0.05, decay: 0.5, sustain: 0.8, release: 1 }, portamento: 0.2 }),
-    "Bass - Synth Wave": () => p(Tone.Synth, { oscillator: { type: "fatsawtooth", count: 3 }, envelope: { attack: 0.01, decay: 0.3, sustain: 0.5, release: 0.5 } }),
+    "Bass - Deep Sine Sub": () => p(Tone.Synth, { oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 0.5, sustain: 1, release: 0.5 } }),
+    "Bass - Deep Square Sub": () => p(Tone.Synth, { oscillator: { type: "square" }, envelope: { attack: 0.05, decay: 0.4, sustain: 0.4, release: 1 } }),
     "Bass - FM Slap": () => p(Tone.FMSynth, { harmonicity: 1, modulationIndex: 3, envelope: { attack: 0.01, decay: 0.2, sustain: 0.1 } }),
-    "Bass - Deep Square": () => p(Tone.Synth, { oscillator: { type: "square" }, envelope: { attack: 0.05, decay: 0.4, sustain: 0.4, release: 1 } }),
-    "Bass - Lo-Fi Sub": () => p(Tone.Synth, { oscillator: { type: "triangle" }, envelope: { attack: 0.1, decay: 0.8, sustain: 0.5 } }),
+    "Bass - Synthwave Saw": () => p(Tone.Synth, { oscillator: { type: "fatsawtooth", count: 3 }, envelope: { attack: 0.01, decay: 0.3, sustain: 0.5, release: 0.5 } }),
+    "Bass - Reese (DnB)": () => p(Tone.Synth, { oscillator: { type: "fatsawtooth", count: 4, spread: 25 }, envelope: { attack: 0.1, decay: 0.5, sustain: 0.8, release: 1 } }),
     "Bass - Acid (TB-303)": () => p(Tone.MonoSynth, { oscillator: { type: "sawtooth" }, filter: { Q: 6, type: "lowpass", rolloff: -24 }, envelope: { attack: 0.01, decay: 0.2 }, filterEnvelope: { attack: 0.01, decay: 0.2, baseFrequency: 200, octaves: 4 } }),
+    "Bass - Pluck": () => p(Tone.Synth, { oscillator: { type: "triangle" }, envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.1 } }),
+    "Bass - Lo-Fi Muffled": () => p(Tone.Synth, { oscillator: { type: "triangle" }, envelope: { attack: 0.1, decay: 0.8, sustain: 0.5 } }),
+    "Bass - Tech House Wobble": () => p(Tone.FMSynth, { harmonicity: 0.5, modulationIndex: 2, envelope: { attack: 0.05, decay: 0.4, sustain: 0.2 } }),
   },
   "🎹 KEYS & PIANOS": {
-    "Keys - Grand Piano (Synth)": () => p(Tone.Synth, { oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 1, sustain: 0, release: 1 } }),
-    "Keys - Rhodes (FM)": () => p(Tone.FMSynth, { harmonicity: 2, modulationIndex: 1.5, oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 2, sustain: 0.2 } }),
+    "Keys - Grand Piano (Synth)": () => p(Tone.Synth, { oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 1.5, sustain: 0, release: 1 } }),
+    "Keys - Electric Piano (FM)": () => p(Tone.FMSynth, { harmonicity: 2, modulationIndex: 1.5, oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 2, sustain: 0.2 } }),
     "Keys - Wurlitzer": () => p(Tone.AMSynth, { harmonicity: 1.5, oscillator: { type: "triangle" }, envelope: { attack: 0.01, decay: 1.5, sustain: 0.1 } }),
+    "Keys - Rhodes": () => p(Tone.FMSynth, { harmonicity: 1, modulationIndex: 1, oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 2, sustain: 0.3 } }),
     "Keys - Toy Piano": () => p(Tone.AMSynth, { harmonicity: 3, oscillator: { type: "triangle" }, envelope: { attack: 0.01, decay: 0.5, sustain: 0 } }),
-    "Keys - Drawbar Organ": () => p(Tone.Synth, { oscillator: { type: "fatsine", count: 4, spread: 20 }, envelope: { attack: 0.01, decay: 0.1, sustain: 1, release: 0.5 } }),
-    "Keys - Church Organ": () => p(Tone.Synth, { oscillator: { type: "fatsquare", count: 3 }, envelope: { attack: 0.1, decay: 0.1, sustain: 1, release: 1 } }),
+    "Keys - Honky Tonk": () => p(Tone.Synth, { oscillator: { type: "fatsawtooth", count: 2, spread: 5 }, envelope: { attack: 0.01, decay: 1, sustain: 0 } }),
+    "Keys - Clavinet": () => p(Tone.Synth, { oscillator: { type: "square" }, envelope: { attack: 0.01, decay: 0.3, sustain: 0.1, release: 0.2 } }),
+    "Organ - Drawbar (Jazz)": () => p(Tone.Synth, { oscillator: { type: "fatsine", count: 4, spread: 20 }, envelope: { attack: 0.01, decay: 0.1, sustain: 1, release: 0.5 } }),
+    "Organ - Church": () => p(Tone.Synth, { oscillator: { type: "fatsquare", count: 3, spread: 5 }, envelope: { attack: 0.1, decay: 0.1, sustain: 1, release: 1 } }),
+    "Organ - Rock (Distorted)": () => p(Tone.Synth, { oscillator: { type: "fatsawtooth", count: 3 }, envelope: { attack: 0.05, decay: 0.1, sustain: 1, release: 0.5 } }),
   },
-  "🎻 STRINGS & ORCHESTRA": {
+  "🎻 STRINGS, ORCHESTRA & CHOIR": {
+    "Strings - Violin": () => p(Tone.Synth, { oscillator: { type: "sawtooth" }, envelope: { attack: 0.2, decay: 0.1, sustain: 0.8, release: 1 } }),
     "Strings - Cello": () => p(Tone.AMSynth, { harmonicity: 1, oscillator: { type: "sawtooth" }, envelope: { attack: 0.3, decay: 1, sustain: 0.8, release: 1.5 } }),
-    "Strings - Violin Ensemble": () => p(Tone.Synth, { oscillator: { type: "fatsawtooth", count: 4, spread: 15 }, envelope: { attack: 0.5, decay: 1, sustain: 0.8, release: 2 } }),
-    "Strings - Pizzicato (Pluck)": () => p(Tone.Synth, { oscillator: { type: "sawtooth" }, envelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.1 } }),
-    "Brass - Synth Horns": () => p(Tone.Synth, { oscillator: { type: "fatsawtooth" }, envelope: { attack: 0.1, decay: 0.2, sustain: 0.9, release: 0.5 } }),
-    "Choir - Synth Voices": () => p(Tone.FMSynth, { harmonicity: 0.5, modulationIndex: 5, oscillator: { type: "triangle" }, envelope: { attack: 0.5, decay: 1, sustain: 1, release: 2 } }),
+    "Strings - Ensemble (Huge)": () => p(Tone.Synth, { oscillator: { type: "fatsawtooth", count: 5, spread: 20 }, envelope: { attack: 0.5, decay: 1, sustain: 0.8, release: 2 } }),
+    "Strings - Pizzicato": () => p(Tone.Synth, { oscillator: { type: "sawtooth" }, envelope: { attack: 0.01, decay: 0.15, sustain: 0, release: 0.1 } }),
+    "Brass - Trumpet": () => p(Tone.Synth, { oscillator: { type: "sawtooth" }, envelope: { attack: 0.1, decay: 0.1, sustain: 0.9, release: 0.2 } }),
+    "Brass - French Horn": () => p(Tone.Synth, { oscillator: { type: "sine" }, envelope: { attack: 0.3, decay: 0.2, sustain: 0.8, release: 1 } }),
+    "Brass - Tuba": () => p(Tone.Synth, { oscillator: { type: "square" }, envelope: { attack: 0.2, decay: 0.1, sustain: 0.8, release: 0.5 } }),
+    "Brass - Synth Ensemble": () => p(Tone.Synth, { oscillator: { type: "fatsawtooth" }, envelope: { attack: 0.1, decay: 0.2, sustain: 0.9, release: 0.5 } }),
+    "Choir - Ahh (FM)": () => p(Tone.FMSynth, { harmonicity: 0.5, modulationIndex: 5, oscillator: { type: "triangle" }, envelope: { attack: 0.5, decay: 1, sustain: 1, release: 2 } }),
+    "Choir - Ooh (Sine)": () => p(Tone.Synth, { oscillator: { type: "fatsine", count: 3 }, envelope: { attack: 0.8, decay: 0.5, sustain: 1, release: 2 } }),
   },
-  "☁️ PADS & ATMOSPHERE": {
+  "☁️ PADS & ATMOSPHERES": {
     "Pad - Dream (Sine)": () => p(Tone.Synth, { oscillator: { type: "fatsine", count: 3, spread: 30 }, envelope: { attack: 1, decay: 0.5, sustain: 1, release: 3 } }),
     "Pad - Dark (Saw)": () => p(Tone.Synth, { oscillator: { type: "fatsawtooth", count: 3, spread: 20 }, envelope: { attack: 1.5, decay: 1, sustain: 0.8, release: 3 } }),
     "Pad - Glass (FM)": () => p(Tone.FMSynth, { harmonicity: 3, modulationIndex: 2, envelope: { attack: 1, decay: 2, sustain: 0.5, release: 3 } }),
     "Pad - Space Drone": () => p(Tone.AMSynth, { harmonicity: 0.5, oscillator: { type: "square" }, envelope: { attack: 2, decay: 1, sustain: 1, release: 4 } }),
     "Pad - Lo-Fi Flutter": () => p(Tone.Synth, { oscillator: { type: "triangle" }, envelope: { attack: 0.5, decay: 0.5, sustain: 0.8, release: 2 } }),
+    "Pad - Metallic Sweep": () => p(Tone.FMSynth, { harmonicity: 5, modulationIndex: 10, envelope: { attack: 2, decay: 1, sustain: 0.5, release: 3 } }),
+    "Pad - Warm Analog": () => p(Tone.Synth, { oscillator: { type: "fatsquare", count: 2 }, envelope: { attack: 0.8, decay: 0.2, sustain: 0.8, release: 2 } }),
+    "Pad - Ghostly": () => p(Tone.AMSynth, { harmonicity: 0.25, oscillator: { type: "sine" }, envelope: { attack: 2, decay: 2, sustain: 0.5, release: 4 } }),
   },
-  "🎵 PLUCKS & MALLETS": {
-    "Pluck - Harp": () => new Tone.PluckSynth({ attackNoise: 1, dampening: 4000, resonance: 0.9 }),
-    "Pluck - Nylon Guitar": () => new Tone.PluckSynth({ attackNoise: 2, dampening: 2000, resonance: 0.7 }),
+  "🎵 PLUCKS, GUITARS & MALLETS": {
+    "Pluck - Harp": () => p(Tone.Synth, { oscillator: { type: "triangle" }, envelope: { attack: 0.01, decay: 1.5, sustain: 0 } }),
+    "Pluck - Nylon Guitar": () => p(Tone.Synth, { oscillator: { type: "sawtooth" }, envelope: { attack: 0.01, decay: 1, sustain: 0 } }),
+    "Pluck - Steel String Guitar": () => p(Tone.Synth, { oscillator: { type: "square" }, envelope: { attack: 0.01, decay: 1.2, sustain: 0 } }),
     "Pluck - Tech Arp": () => p(Tone.FMSynth, { harmonicity: 2, modulationIndex: 2, oscillator: { type: "square" }, envelope: { attack: 0.001, decay: 0.1, sustain: 0 } }),
+    "Pluck - Lo-Fi Mute": () => p(Tone.Synth, { oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 0.2, sustain: 0 } }),
     "Mallet - Marimba": () => p(Tone.FMSynth, { harmonicity: 4, modulationIndex: 1, envelope: { attack: 0.005, decay: 0.3, sustain: 0 } }),
     "Mallet - Kalimba": () => p(Tone.FMSynth, { harmonicity: 8, modulationIndex: 0.5, envelope: { attack: 0.01, decay: 0.5, sustain: 0 } }),
     "Mallet - Music Box": () => p(Tone.AMSynth, { harmonicity: 5, oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 0.8, sustain: 0 } }),
+    "Mallet - Vibraphone": () => p(Tone.AMSynth, { harmonicity: 2, oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 1.5, sustain: 0.2 } }),
+    "Mallet - Xylophone": () => p(Tone.Synth, { oscillator: { type: "square" }, envelope: { attack: 0.005, decay: 0.2, sustain: 0 } }),
   },
-  "🚀 LEADS & CHIPTUNE": {
-    "Lead - Theremin Glide": () => p(Tone.Synth, { oscillator: { type: "sine" }, envelope: { attack: 0.5, decay: 0, sustain: 1, release: 0.5 } }),
-    "Lead - Fat Trance": () => p(Tone.Synth, { oscillator: { type: "fatsawtooth", count: 3, spread: 15 }, envelope: { attack: 0.05, decay: 0.3, sustain: 0.5, release: 0.5 } }),
-    "Lead - Smooth Square": () => p(Tone.Synth, { oscillator: { type: "square" }, filter: { type: "lowpass", frequency: 1000 }, envelope: { attack: 0.1, decay: 0.2, sustain: 0.8 } }),
-    "8-Bit - Gameboy Square": () => p(Tone.Synth, { oscillator: { type: "square" }, envelope: { attack: 0.01, decay: 0.1, sustain: 0.5, release: 0.1 } }),
-    "8-Bit - Retro Triangle": () => p(Tone.Synth, { oscillator: { type: "triangle" }, envelope: { attack: 0.01, decay: 0.2, sustain: 0.8, release: 0.1 } }),
+  "🚀 LEADS & SYNTHS": {
+    "Lead - Theremin Glide": () => p(Tone.Synth, { oscillator: { type: "sine" }, envelope: { attack: 0.5, decay: 0, sustain: 1, release: 0.5 }, portamento: 0.2 }),
+    "Lead - Fat Trance Saw": () => p(Tone.Synth, { oscillator: { type: "fatsawtooth", count: 3, spread: 15 }, envelope: { attack: 0.05, decay: 0.3, sustain: 0.5, release: 0.5 } }),
+    "Lead - Smooth Square": () => p(Tone.Synth, { oscillator: { type: "square" }, envelope: { attack: 0.1, decay: 0.2, sustain: 0.8, release: 0.2 } }),
+    "Lead - EDM Pluck": () => p(Tone.Synth, { oscillator: { type: "fatsawtooth", count: 2 }, envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.2 } }),
+    "Lead - G-Funk Whistle": () => p(Tone.Synth, { oscillator: { type: "sine" }, envelope: { attack: 0.1, decay: 0, sustain: 1, release: 0.2 }, portamento: 0.1 }),
+    "Lead - Hard Sync": () => p(Tone.FMSynth, { harmonicity: 2.5, modulationIndex: 5, oscillator: { type: "sawtooth" }, envelope: { attack: 0.05, decay: 0.5, sustain: 0.5 } }),
+    "Lead - Flute (Synth)": () => p(Tone.AMSynth, { harmonicity: 2, oscillator: { type: "triangle" }, envelope: { attack: 0.1, decay: 0.1, sustain: 0.8, release: 0.5 } }),
+    "Lead - Ocarina": () => p(Tone.Synth, { oscillator: { type: "sine" }, envelope: { attack: 0.05, decay: 0.1, sustain: 0.9, release: 0.1 } }),
   },
-  "💥 SOUND FX": {
-    "FX - Sub Drop": () => new Tone.MembraneSynth({ pitchDecay: 0.5, octaves: 10, envelope: { attack: 0.01, decay: 3 } }),
-    "FX - Zap / Laser": () => new Tone.MembraneSynth({ pitchDecay: 0.01, octaves: 8, envelope: { attack: 0.001, decay: 0.2 } }),
-    "FX - White Noise Sweep": () => new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 2, decay: 1, sustain: 0, release: 1 } }),
+  "🕹️ CHIPTUNE & 8-BIT": {
+    "8-Bit - Gameboy Square 50%": () => p(Tone.Synth, { oscillator: { type: "square" }, envelope: { attack: 0.001, decay: 0.1, sustain: 0.5, release: 0.05 } }),
+    "8-Bit - NES Pulse 25%": () => p(Tone.Synth, { oscillator: { type: "pulse", width: 0.25 }, envelope: { attack: 0.001, decay: 0.1, sustain: 0.5, release: 0.05 } }),
+    "8-Bit - NES Pulse 12.5%": () => p(Tone.Synth, { oscillator: { type: "pulse", width: 0.125 }, envelope: { attack: 0.001, decay: 0.1, sustain: 0.5, release: 0.05 } }),
+    "8-Bit - Retro Triangle": () => p(Tone.Synth, { oscillator: { type: "triangle" }, envelope: { attack: 0.001, decay: 0.2, sustain: 0.8, release: 0.1 } }),
+    "8-Bit - Pluck": () => p(Tone.Synth, { oscillator: { type: "square" }, envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.05 } }),
+    "8-Bit - Noise Hit": () => n({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.1, sustain: 0 } }),
+    "8-Bit - Bass": () => p(Tone.Synth, { oscillator: { type: "square" }, envelope: { attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.1 } }),
+    "8-Bit - Laser Fast": () => m({ pitchDecay: 0.01, octaves: 10, envelope: { attack: 0.001, decay: 0.1 } }),
+  },
+  "💥 SOUND FX & RISERS": {
+    "FX - Sub Drop": () => m({ pitchDecay: 0.5, octaves: 10, envelope: { attack: 0.01, decay: 3 } }),
+    "FX - Laser Gun": () => m({ pitchDecay: 0.01, octaves: 8, envelope: { attack: 0.001, decay: 0.3 } }),
+    "FX - White Noise Sweep Up": () => n({ noise: { type: 'white' }, envelope: { attack: 2, decay: 0.1, sustain: 1, release: 0.1 } }),
+    "FX - White Noise Sweep Down": () => n({ noise: { type: 'white' }, envelope: { attack: 0.01, decay: 2, sustain: 0, release: 0.1 } }),
+    "FX - Explosion": () => n({ noise: { type: 'brown' }, envelope: { attack: 0.01, decay: 1.5, sustain: 0 } }),
+    "FX - Beep Boop": () => p(Tone.Synth, { oscillator: { type: "sine" }, envelope: { attack: 0.001, decay: 0.1, sustain: 0 } }),
+    "FX - Magic Chime": () => met({ frequency: 1000, envelope: { attack: 0.01, decay: 2 }, harmonicity: 12, resonance: 8000 }),
+    "FX - Alarm": () => p(Tone.FMSynth, { harmonicity: 0.5, modulationIndex: 10, envelope: { attack: 0.05, decay: 0.5, sustain: 0 } }),
   }
 };
 
@@ -232,7 +297,6 @@ function startTimingLoop() {
         const synth = synthInstances[ch.id];
         if (synth && synth.node) {
           try {
-            // Note length scales slightly with BPM for better sound
             synth.node.triggerAttackRelease(ch.note, "16n", time);
           } catch(e) {}
         }
