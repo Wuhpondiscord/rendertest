@@ -939,25 +939,25 @@ async function boot(){
   try{ fetch(RENDER_URL + "/").catch(function(){}); }catch(e){}
 
   // ── Step 2: Load Discord SDK via script tag ────────────────────────────
+  // External CDNs (jsdelivr etc.) are blocked by Discord's CSP.
+  // We serve the UMD build from our own backend at /api/sdk.
   if(IN_DISCORD){
     ovMsg("LOADING SDK...", 20);
     await Promise.race([
       new Promise(function(res){
         var s = document.createElement("script");
-        // Use v1 UMD build — v2 has a postMessage recursion bug in script-tag usage
-        s.src = "https://cdn.jsdelivr.net/npm/@discord/embedded-app-sdk@1/dist/index.js";
+        s.src = "/api/sdk";  // served by Render, same origin — not blocked by CSP
         s.onload = function(){
-          // UMD build exports as window.DiscordSDK or window.EmbeddedAppSdk
           var cls = (window.DiscordSDK && (window.DiscordSDK.DiscordSDK || window.DiscordSDK))
                  || (window.EmbeddedAppSdk && window.EmbeddedAppSdk.DiscordSDK);
-          console.log("SDK script loaded, class found:", typeof cls);
+          console.log("SDK loaded, class:", typeof cls);
           window._SDKClass = cls;
           res();
         };
-        s.onerror = function(){ console.warn("SDK script load failed"); res(); };
+        s.onerror = function(e){ console.warn("SDK script failed:", e); res(); };
         document.head.appendChild(s);
       }),
-      new Promise(function(res){ setTimeout(res, 6000); })
+      new Promise(function(res){ setTimeout(function(){ console.warn("SDK load timeout"); res(); }, 8000); })
     ]);
   }
 
