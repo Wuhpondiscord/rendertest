@@ -34,7 +34,16 @@ app.use(cors({ origin: "*" }));  // Discord's proxy rewrites the origin — wild
 app.use(express.json());
 
 const io = new Server(server, {
-  cors: { origin: "*", methods: ["GET", "POST"] },
+  // IMPORTANT: Discord's Activity proxy only supports HTTP (polling), not raw WebSocket.
+  // allowEIO3 ensures compatibility with older socket.io clients.
+  // The client inside Discord will connect via polling; direct browser uses websocket.
+  cors: {
+    origin : "*",
+    methods: ["GET", "POST"],
+  },
+  allowEIO3     : true,          // backwards compat
+  pingTimeout   : 60000,         // keep connections alive through Discord's proxy
+  pingInterval  : 25000,
 });
 
 // ════════════════════════════════════════════════════════════════
