@@ -8,6 +8,9 @@ const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch
 const app = express();
 const server = http.createServer(app);
 
+// Use a fixed port
+const PORT = 3001;
+
 // Allow Discord iframes to fetch from this API
 app.use(cors({ origin: "*" }));
 app.use(express.json());
@@ -15,8 +18,6 @@ app.use(express.json());
 const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] }
 });
-
-const PORT = process.env.PORT || 3001;
 
 // --- DAW STATE ---
 let savedProjects = {};
@@ -38,7 +39,7 @@ app.post("/api/token", async (req, res) => {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
-        client_id: process.env.VITE_CLIENT_ID, // Ensure this matches your env key
+        client_id: process.env.VITE_CLIENT_ID,
         client_secret: process.env.DISCORD_CLIENT_SECRET,
         grant_type: "authorization_code",
         code: code,
@@ -46,14 +47,14 @@ app.post("/api/token", async (req, res) => {
     });
     
     const data = await response.json();
-    res.json(data); // Using .json() is safer than .send()
+    res.json(data);
   } catch (err) {
     console.error("Token Exchange Error:", err);
     res.status(500).send({ error: "Failed to exchange token" });
   }
 });
 
-app.get("/", (req, res) => res.send("Discord DAW Server Running"));
+app.get("/", (req, res) => res.send("Discord DAW Server Running on port " + PORT));
 
 io.on("connection", (socket) => {
   userCount++;
@@ -91,7 +92,6 @@ io.on("connection", (socket) => {
     const channel = state.channels.find(c => c.id === channelId);
     if (channel) {
       channel[key] = value;
-      // Broadcast to others so their UI updates, but don't broadcast back to sender to prevent loops
       socket.broadcast.emit("trackParamUpdated", { channelId, key, value });
     }
   });
