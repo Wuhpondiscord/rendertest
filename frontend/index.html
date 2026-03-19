@@ -938,27 +938,18 @@ async function boot(){
   // ── Step 1: wake up Render early ──────────────────────────────────────────
   try{ fetch(RENDER_URL + "/").catch(function(){}); }catch(e){}
 
-  // ── Step 2: Load Discord SDK via script tag ────────────────────────────
-  // External CDNs (jsdelivr etc.) are blocked by Discord's CSP.
-  // We serve the UMD build from our own backend at /api/sdk.
-  if(IN_DISCORD){
+  // ── Step 2: Load Discord SDK ────────────────────────────────────────────
+  // SDK is ESM-only — must use dynamic import(). No UMD/script-tag build exists.
+  // Served from /api/sdk (our Render backend) to bypass Discord's CSP on external CDNs.
+  if(IN_DISCORD && !window._SDKClass){
     ovMsg("LOADING SDK...", 20);
-    await Promise.race([
-      new Promise(function(res){
-        var s = document.createElement("script");
-        s.src = "/api/sdk";  // served by Render, same origin — not blocked by CSP
-        s.onload = function(){
-          var cls = (window.DiscordSDK && (window.DiscordSDK.DiscordSDK || window.DiscordSDK))
-                 || (window.EmbeddedAppSdk && window.EmbeddedAppSdk.DiscordSDK);
-          console.log("SDK loaded, class:", typeof cls);
-          window._SDKClass = cls;
-          res();
-        };
-        s.onerror = function(e){ console.warn("SDK script failed:", e); res(); };
-        document.head.appendChild(s);
-      }),
-      new Promise(function(res){ setTimeout(function(){ console.warn("SDK load timeout"); res(); }, 8000); })
-    ]);
+    try{
+      var sdkMod = await import("/api/sdk");
+      window._SDKClass = sdkMod.DiscordSDK;
+      console.log("SDK loaded, DiscordSDK:", typeof window._SDKClass);
+    }catch(e){
+      console.warn("SDK import failed:", e.message);
+    }
   }
 
   // ── Step 3: load socket.io ──────────────────────────────────────────────
@@ -1002,13 +993,12 @@ async function boot(){
     console.log("clientId:", clientId ? "ok" : "missing", "secret:", clientSecret ? "ok" : "missing");
   }catch(e){ console.warn("Config fetch failed:", e.message); }
 
-  // ── Step 6: Discord auth ────────────────────────────────────────────────
-  if(IN_DISCORD && clientId){
+  if(IN_DISCORD && clientId && !window._authDone){
+    window._authDone = true;
     ovMsg("DISCORD AUTH...", 80);
     try{
-      // Use SDK class set by the script tag onload handler
       var SDKClass = window._SDKClass;
-      if(!SDKClass) throw new Error("DiscordSDK class not found — script may have failed to load");
+      if(!SDKClass) throw new Error("DiscordSDK class not found");
       console.log("SDKClass found:", typeof SDKClass);
 
       if(!discordSdk){
@@ -1027,10 +1017,7 @@ async function boot(){
       });
       console.log("Got auth code");
 
-      // Exchange code DIRECTLY from browser to discord.com.
-      // Render's shared free-tier IPs get 429 rate-limited by Discord's Cloudflare
-      // when the server makes this request. The browser uses the user's own IP
-      // which is never rate-limited.
+      // Exchange code directly from browser — bypasses Render's rate-limited IP
       var tokenRes = await fetch("https://discord.com/api/oauth2/token", {
         method : "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
