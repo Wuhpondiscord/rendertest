@@ -12,10 +12,15 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3001;
 
-// Project Database (In-Memory for now)
+// =========================
+// In-Memory Storage
+// =========================
 let savedProjects = {};
 
-// Active Live State
+// Active users in session
+let activeUsers = {}; // socket.id -> { userId, username }
+
+// Active DAW state
 let state = {
   projectId: "default",
   projectName: "Untitled Session",
@@ -29,50 +34,100 @@ let userCount = 0;
 
 app.get("/", (req, res) => res.send("Multiplayer DAW Server is running"));
 
+// =========================
+// SOCKET CONNECTION
+// =========================
 io.on("connection", (socket) => {
   userCount++;
+
+  // Temporary until client sends identity
+  activeUsers[socket.id] = {
+    userId: null,
+    username: "Anonymous"
+  };
+
   io.emit("userCount", userCount);
   socket.emit("initState", state);
   socket.emit("projectList", Object.keys(savedProjects));
 
-  // STEP TOGGLES
-  socket.on("toggleStep", ({ channelId, stepIndex, val }) => {
-    const channel = state.channels.find(c => c.id === channelId);
-    if (channel) {
-      channel.pattern[stepIndex] = val;
-      io.emit("stepToggled", { channelId, stepIndex, val });
-    }
+  // =========================
+  // USER AUTH (Discord Identity)
+  // =========================
+  socket.on("registerUser", ({ userId, username }) => {
+    activeUsers[socket.id] = { userId, username };
+
+    io.emit("presenceUpdate", Object.values(activeUsers));
   });
 
+  // =========================
+  // STEP TOGGLES (Ownership protected)
+  // =========================
+  socket.on("toggleStep", ({ channelId, stepIndex, val }) => {
+    const channel = state.channels.find(c => c.id === channelId);
+    if (!channel) return;
+
+    const user = activeUsers[socket.id];
+
+    // 🔒 Only owner can edit
+    if (channel.userId && channel.userId !== user.userId) return;
+
+    channel.pattern[stepIndex] = val;
+
+    io.emit("stepToggled", { channelId, stepIndex, val });
+  });
+
+  // =========================
   // TRACK MANAGEMENT
-  socket.on("addTrack", (authorName) => {
+  // =========================
+  socket.on("addTrack", ({ userId, username }) => {
     state.channels.push({
       id: "c_" + crypto.randomUUID(),
-      author: authorName || "Unknown",
+      author: username || "Unknown",
+      userId: userId || null,
       inst: "Keys - Grand Piano (Synth)",
       note: "C4",
       vol: -6,
-      speed: 2, // 1=Fast, 2=Normal, 4=Slow
+      speed: 2,
       pattern: Array(state.steps).fill(false)
     });
+
     io.emit("stateUpdate", state);
   });
 
   socket.on("removeTrack", (channelId) => {
+    const user = activeUsers[socket.id];
+    const channel = state.channels.find(c => c.id === channelId);
+
+    if (!channel) return;
+
+    // 🔒 Only owner can delete
+    if (channel.userId && channel.userId !== user.userId) return;
+
     state.channels = state.channels.filter(c => c.id !== channelId);
+
     io.emit("stateUpdate", state);
   });
 
-  // SMOOTH PARAMETER SYNC (Fixes Volume Bug)
+  // =========================
+  // PARAM UPDATES (Ownership protected)
+  // =========================
   socket.on("updateTrackParam", ({ channelId, key, value }) => {
     const channel = state.channels.find(c => c.id === channelId);
-    if (channel) {
-      channel[key] = value;
-      socket.broadcast.emit("trackParamUpdated", { channelId, key, value });
-    }
+    if (!channel) return;
+
+    const user = activeUsers[socket.id];
+
+    // 🔒 Only owner can edit
+    if (channel.userId && channel.userId !== user.userId) return;
+
+    channel[key] = value;
+
+    socket.broadcast.emit("trackParamUpdated", { channelId, key, value });
   });
 
+  // =========================
   // GLOBAL CONTROLS
+  // =========================
   socket.on("setBPM", (newBpm) => {
     state.bpm = newBpm;
     io.emit("bpmUpdate", state.bpm);
@@ -85,6 +140,7 @@ io.on("connection", (socket) => {
 
   socket.on("changeSteps", (newSteps) => {
     state.steps = newSteps;
+
     state.channels.forEach(ch => {
       const newPattern = Array(newSteps).fill(false);
       for (let i = 0; i < Math.min(ch.pattern.length, newSteps); i++) {
@@ -92,6 +148,7 @@ io.on("connection", (socket) => {
       }
       ch.pattern = newPattern;
     });
+
     io.emit("stateUpdate", state);
   });
 
@@ -100,12 +157,15 @@ io.on("connection", (socket) => {
     io.emit("stateUpdate", state);
   });
 
+  // =========================
   // PROJECT MANAGEMENT
+  // =========================
   socket.on("saveProject", (name) => {
     state.projectName = name;
     state.projectId = "proj_" + Date.now();
-    // Deep copy current state
+
     savedProjects[state.projectName] = JSON.parse(JSON.stringify(state));
+
     io.emit("projectList", Object.keys(savedProjects));
     io.emit("stateUpdate", state);
   });
@@ -113,15 +173,27 @@ io.on("connection", (socket) => {
   socket.on("loadProject", (name) => {
     if (savedProjects[name]) {
       state = JSON.parse(JSON.stringify(savedProjects[name]));
-      state.isPlaying = false; // Always load paused
+      state.isPlaying = false;
       io.emit("stateUpdate", state);
     }
   });
 
+  // =========================
+  // DISCONNECT
+  // =========================
   socket.on("disconnect", () => {
     userCount--;
+
+    delete activeUsers[socket.id];
+
     io.emit("userCount", userCount);
+    io.emit("presenceUpdate", Object.values(activeUsers));
   });
 });
 
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// =========================
+// START SERVER
+// =========================
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
