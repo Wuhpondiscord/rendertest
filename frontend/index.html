@@ -421,12 +421,14 @@
     /* ── DEBUG LOG PANEL ───────────────────────────────────────── */
     #log-panel {
       position: fixed; bottom: 0; left: 0; right: 0;
-      height: 50vh; z-index: 10000;
+      height: 35vh; z-index: 10000;
       background: rgba(4,4,8,.98);
       border-top: 2px solid var(--accent);
-      display: flex; flex-direction: column;  /* always open — no button needed */
+      display: flex; flex-direction: column;
       font-family: var(--mono); font-size: 10px;
+      cursor: pointer; /* tap anywhere to hide */
     }
+    #log-panel.hidden { display: none; }
     #log-toolbar {
       display: flex; align-items: center; gap: 6px;
       padding: 4px 8px; border-bottom: 1px solid var(--border);
@@ -689,22 +691,30 @@ try { (function(){
     });
     window.addEventListener("unhandledrejection",function(e){
       var m="?"; try{ m=e.reason&&e.reason.message?e.reason.message:String(e.reason); }catch(x){}
+      // Suppress known SDK postMessage noise — harmless, fires after authenticate() resolves
+      if(m.indexOf("postMessage")!==-1 || m.indexOf("call stack")!==-1) return;
       addLine("err","PROMISE: "+m);
     });
   }catch(e){}
 
-  // panel is always open — toggleLog just resets the indicator colour
+  // tap the panel to hide, tap the log button in transport bar to show again
   W.toggleLog=function(){
     try{
+      var panel=document.getElementById("log-panel");
+      if(!panel) return;
+      if(panel.classList.contains("hidden")){
+        panel.classList.remove("hidden");
+        var el=document.getElementById("log-entries");
+        if(el) el.scrollTop=99999999;
+      } else {
+        panel.classList.add("hidden");
+      }
       worstLevel=0;
       var ids=["log-toggle","ov-log-btn"];
       for(var bi=0;bi<ids.length;bi++){
         var btn=document.getElementById(ids[bi]);
         if(btn){ btn.style.color=""; btn.style.borderColor=""; }
       }
-      // scroll to bottom so latest entries are visible
-      var el=document.getElementById("log-entries");
-      if(el) el.scrollTop=99999999;
     }catch(e){}
   };
 
@@ -1677,19 +1687,24 @@ function dlBlob(blob,name){
   setTimeout(()=>URL.revokeObjectURL(url),5000);
 }
 
+// Auto-hide log panel after 15s — user can tap to re-show via log button
+setTimeout(function(){
+  var p = document.getElementById("log-panel");
+  if(p) p.classList.add("hidden");
+}, 15000);
+
 // ── KICK OFF ───────────────────────────────────────────────────
 boot();
 </script>
 
-<!-- DEBUG LOG PANEL -->
-<div id="log-panel">
+<!-- DEBUG LOG PANEL — tap anywhere to hide -->
+<div id="log-panel" onclick="this.classList.add('hidden')">
   <div id="log-toolbar">
-    <span>DEBUG CONSOLE</span>
-    <button id="log-copy"  onclick="W.copyLogs()">⧉ COPY ALL</button>
-    <button id="log-clear" onclick="W.clearLogs()">✕ CLEAR</button>
-    <button id="log-close" onclick="W.toggleLog()">▼ HIDE</button>
+    <span>DEBUG CONSOLE — TAP TO HIDE</span>
+    <button id="log-copy"  onclick="event.stopPropagation();W.copyLogs()">⧉ COPY ALL</button>
+    <button id="log-clear" onclick="event.stopPropagation();W.clearLogs()">✕ CLEAR</button>
   </div>
-  <div id="log-entries"></div>
+  <div id="log-entries" onclick="event.stopPropagation()"></div>
 </div>
 </body>
 </html>
