@@ -8,14 +8,15 @@ const app = express();
 const server = http.createServer(app);
 
 const io = new Server(server, {
-  cors: { origin: "*", methods: ["GET", "POST"] }
+  cors: { 
+    origin: "*", // Necessary because frontend is on Netlify and backend is on Render
+    methods: ["GET", "POST"] 
+  }
 });
 
 const PORT = process.env.PORT || 3001;
 
-/**
- * IN-MEMORY STORAGE & INITIAL STATE
- */
+// --- IN-MEMORY STORAGE ---
 let savedProjects = {};
 let activeUsers = {}; 
 
@@ -32,38 +33,47 @@ let userCount = 0;
 
 app.use(express.json());
 
-// Health Check - Visit this URL in your browser to verify the server is up
+/**
+ * 1. HEALTH CHECK
+ * Visit your Render URL (e.g., https://your-app.onrender.com/) in a browser.
+ * It will tell you if your Environment Variables are actually loaded.
+ */
 app.get("/", (req, res) => {
   res.send({
     status: "Online",
-    clientIdLoaded: !!process.env.VITE_CLIENT_ID,
-    clientSecretLoaded: !!process.env.DISCORD_CLIENT_SECRET
+    VITE_CLIENT_ID: process.env.VITE_CLIENT_ID ? "LOADED" : "MISSING",
+    DISCORD_CLIENT_SECRET: process.env.DISCORD_CLIENT_SECRET ? "LOADED" : "MISSING",
+    info: "Discord Studio Pro Server"
   });
 });
 
 /**
- * DISCORD OAUTH2 TOKEN BRIDGE
- * FIXED: Added better error logging to debug "Stuck at Initializing"
+ * 2. DISCORD AUTH BRIDGE
+ * If the DAW hangs at 'Initializing', the error will appear in your Render Logs here.
  */
 app.post("/api/token", async (req, res) => {
   const { code } = req.body;
   
   if (!code) {
-    console.error("❌ Auth Error: No code provided by frontend.");
+    console.error("❌ Auth Error: No code received from frontend.");
     return res.status(400).json({ error: "No code provided" });
   }
 
-  if (!process.env.DISCORD_CLIENT_SECRET || !process.env.VITE_CLIENT_ID) {
-    console.error("❌ Config Error: Render Environment Variables are missing!");
-    return res.status(500).json({ error: "Server missing environment variables" });
+  // Double-check variables are present
+  const clientId = process.env.VITE_CLIENT_ID;
+  const clientSecret = process.env.DISCORD_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    console.error("❌ Config Error: Environment variables are not set on Render.");
+    return res.status(500).json({ error: "Server environment variables missing" });
   }
 
   try {
     const response = await fetch(`https://discord.com/api/oauth2/token`, {
       method: "POST",
       body: new URLSearchParams({
-        client_id: process.env.VITE_CLIENT_ID,
-        client_secret: process.env.DISCORD_CLIENT_SECRET,
+        client_id: clientId,
+        client_secret: clientSecret,
         grant_type: "authorization_code",
         code: code,
       }),
@@ -73,20 +83,20 @@ app.post("/api/token", async (req, res) => {
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("❌ Discord API Error:", data);
+      console.error("❌ Discord API Rejected the token exchange:", data);
       return res.status(response.status).json(data);
     }
     
-    console.log("✅ Discord Auth Successful");
+    console.log("✅ Discord Auth Successful for code:", code.substring(0, 5) + "...");
     res.send(data);
   } catch (err) {
-    console.error("❌ Auth Bridge Critical Failure:", err.message);
+    console.error("❌ Critical Failure in Auth Bridge:", err.message);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
 /**
- * SOCKET.IO LOGIC
+ * 3. SOCKET.IO LOGIC
  */
 io.on("connection", (socket) => {
   userCount++;
@@ -202,9 +212,10 @@ io.on("connection", (socket) => {
     userCount = Math.max(0, userCount - 1);
     delete activeUsers[socket.id];
     io.emit("userCount", userCount);
+    io.emit("presenceUpdate", Object.values(activeUsers));
   });
 });
 
 server.listen(PORT, () => {
-  console.log(`🚀 DAW Server Running on Port ${PORT}`);
+  console.log(`🚀 DAW Server Live: Port ${PORT}`);
 });
