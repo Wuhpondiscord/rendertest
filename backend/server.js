@@ -122,6 +122,7 @@ app.post("/api/token", async (req, res) => {
   }
 
   try {
+    // Per Discord docs the token endpoint ONLY accepts application/x-www-form-urlencoded
     const r = await fetch("https://discord.com/api/oauth2/token", {
       method  : "POST",
       headers : { "Content-Type": "application/x-www-form-urlencoded" },
@@ -134,15 +135,17 @@ app.post("/api/token", async (req, res) => {
     });
     const data = await r.json();
     if (data.error) return res.status(400).json({ error: data.error_description || data.error });
-    res.json(data);
+    // Return only access_token to client — never expose client_secret or refresh_token
+    res.json({ access_token: data.access_token });
   } catch (err) {
     console.error("Discord token exchange error:", err);
     res.status(500).json({ error: "TOKEN_EXCHANGE_FAILED" });
   }
 });
 
+// Health check / status page
 app.get("/", (req, res) =>
-  res.send(`<pre>Discord Studio Pro – Server running on port ${PORT}\nUsers online: ${userCount}</pre>`)
+  res.json({ status: "ok", users: userCount, uptime: process.uptime() })
 );
 
 // ════════════════════════════════════════════════════════════════
