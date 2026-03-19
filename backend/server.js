@@ -12,15 +12,17 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3001;
 
+// Project Database (In-Memory for now)
+let savedProjects = {};
+
+// Active Live State
 let state = {
+  projectId: "default",
+  projectName: "Untitled Session",
   bpm: 120,
   steps: 16,
   isPlaying: false,
-  channels: [
-    { id: "c_" + crypto.randomUUID(), inst: "Kick - 808", note: "C2", vol: -2, pattern: Array(16).fill(false) },
-    { id: "c_" + crypto.randomUUID(), inst: "Snare - Trap", note: "C4", vol: -6, pattern: Array(16).fill(false) },
-    { id: "c_" + crypto.randomUUID(), inst: "Hat - Closed (Trap)", note: "C4", vol: -10, pattern: Array(16).fill(false) }
-  ]
+  channels: []
 };
 
 let userCount = 0;
@@ -31,23 +33,26 @@ io.on("connection", (socket) => {
   userCount++;
   io.emit("userCount", userCount);
   socket.emit("initState", state);
+  socket.emit("projectList", Object.keys(savedProjects));
 
-  // LIGHTWEIGHT UPDATE: Only syncs the specific note clicked
-  socket.on("toggleStep", ({ channelId, stepIndex }) => {
+  // STEP TOGGLES
+  socket.on("toggleStep", ({ channelId, stepIndex, val }) => {
     const channel = state.channels.find(c => c.id === channelId);
     if (channel) {
-      channel.pattern[stepIndex] = !channel.pattern[stepIndex];
-      // Broadcast just the step change, not the whole state
-      io.emit("stepToggled", { channelId, stepIndex, val: channel.pattern[stepIndex] });
+      channel.pattern[stepIndex] = val;
+      io.emit("stepToggled", { channelId, stepIndex, val });
     }
   });
 
-  socket.on("addTrack", () => {
+  // TRACK MANAGEMENT
+  socket.on("addTrack", (authorName) => {
     state.channels.push({
       id: "c_" + crypto.randomUUID(),
-      inst: "Keys - FM Piano",
+      author: authorName || "Unknown",
+      inst: "Keys - Grand Piano (Synth)",
       note: "C4",
-      vol: -8,
+      vol: -6,
+      speed: 2, // 1=Fast, 2=Normal, 4=Slow
       pattern: Array(state.steps).fill(false)
     });
     io.emit("stateUpdate", state);
@@ -58,14 +63,16 @@ io.on("connection", (socket) => {
     io.emit("stateUpdate", state);
   });
 
-  socket.on("updateTrack", ({ channelId, key, value }) => {
+  // SMOOTH PARAMETER SYNC (Fixes Volume Bug)
+  socket.on("updateTrackParam", ({ channelId, key, value }) => {
     const channel = state.channels.find(c => c.id === channelId);
     if (channel) {
       channel[key] = value;
-      io.emit("stateUpdate", state); // Full update for instruments/notes
+      socket.broadcast.emit("trackParamUpdated", { channelId, key, value });
     }
   });
 
+  // GLOBAL CONTROLS
   socket.on("setBPM", (newBpm) => {
     state.bpm = newBpm;
     io.emit("bpmUpdate", state.bpm);
@@ -91,6 +98,24 @@ io.on("connection", (socket) => {
   socket.on("clearGrid", () => {
     state.channels.forEach(ch => ch.pattern.fill(false));
     io.emit("stateUpdate", state);
+  });
+
+  // PROJECT MANAGEMENT
+  socket.on("saveProject", (name) => {
+    state.projectName = name;
+    state.projectId = "proj_" + Date.now();
+    // Deep copy current state
+    savedProjects[state.projectName] = JSON.parse(JSON.stringify(state));
+    io.emit("projectList", Object.keys(savedProjects));
+    io.emit("stateUpdate", state);
+  });
+
+  socket.on("loadProject", (name) => {
+    if (savedProjects[name]) {
+      state = JSON.parse(JSON.stringify(savedProjects[name]));
+      state.isPlaying = false; // Always load paused
+      io.emit("stateUpdate", state);
+    }
   });
 
   socket.on("disconnect", () => {
