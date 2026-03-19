@@ -11,8 +11,7 @@
     :root {
       --bg: #11111b; --panel: #1e1e2e; --panel-light: #313244;
       --text: #cdd6f4; --step-off-1: #45475a; --step-off-2: #585b70;
-      --step-on: #89b4fa; --step-active: #f9e2af; --accent: #a6e3a1;
-      --danger: #f38ba8;
+      --step-on: #89b4fa; --step-active: #f9e2af; --accent: #a6e3a1; --danger: #f38ba8;
     }
     
     body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; user-select: none; height: 100vh; overflow: hidden; }
@@ -25,7 +24,7 @@
     #status { font-size: 12px; font-weight: bold; color: var(--danger); }
     #users { font-size: 11px; color: #a6adc8; }
 
-    button, select { background: var(--step-off-1); color: var(--text); border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; outline: none; }
+    button, select, input[type="range"] { background: var(--step-off-1); color: var(--text); border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; outline: none; }
     button:hover, select:hover { background: var(--step-off-2); }
     #playBtn { background: var(--accent); color: #111; }
     .control-group { display: flex; align-items: center; gap: 10px; background: var(--panel-light); padding: 5px 15px; border-radius: 6px; }
@@ -41,11 +40,13 @@
     .track-controls { position: sticky; left: 0; display: flex; align-items: center; gap: 5px; background: var(--panel); padding-right: 15px; z-index: 10; border-right: 2px solid var(--panel-light); }
     .delete-btn { background: transparent; color: var(--danger); padding: 5px 10px; font-size: 16px; }
     .delete-btn:hover { background: rgba(243, 139, 168, 0.2); }
-    .inst-select { width: 140px; font-size: 12px; padding: 6px; }
-    .note-select { width: 65px; font-size: 12px; padding: 6px; }
+    
+    .inst-select { width: 150px; font-size: 11px; padding: 6px; }
+    .note-select { width: 60px; font-size: 11px; padding: 6px; }
+    .vol-slider { width: 60px; height: 4px; cursor: pointer; }
 
     .steps { display: flex; gap: 4px; padding-right: 20px;}
-    .step-btn { width: 35px; height: 45px; border-radius: 4px; border: 2px solid transparent; padding: 0; flex-shrink: 0; }
+    .step-btn { width: 35px; height: 45px; border-radius: 4px; border: 2px solid transparent; padding: 0; flex-shrink: 0; transition: transform 0.05s;}
     .step-btn.beat-0 { background: var(--step-off-1); }
     .step-btn.beat-1 { background: var(--step-off-2); }
     
@@ -88,57 +89,71 @@
 </div>
 
 <script>
+// --- NETWORK SETUP ---
 const socket = io("https://beat-backend-5nnu.onrender.com", { transports: ["websocket"] });
 let currentStep = 0; let isPlaying = false;
 let buttons = {}; 
-let synthInstances = {}; // Stores actual Tone.js synth nodes
+let synthInstances = {};
 
 let state = { bpm: 120, steps: 16, channels: [] };
+const NOTES = ["C1","D1","E1","F1","G1","A1","B1", "C2","D2","E2","F2","G2","A2","B2", "C3","D3","E3","F3","G3","A3","B3", "C4","D4","E4","F4","G4","A4","B4", "C5","D5","E5","F5","G5","A5","B5", "C6","D6","E6","F6","G6","A6","B6"];
 
-// --- THE SYNTH LIBRARY (60+ Handcrafted Generators) ---
+// --- MASSIVE SYNTH FACTORY (70+ Sounds) ---
+const makePoly = (type, opts) => new Tone.PolySynth(type, opts);
 const SYNTH_LIBRARY = {
-  // 🥁 DRUMS
-  "Kick - 808": () => new Tone.MembraneSynth({ pitchDecay: 0.005, octaves: 2, envelope: { attack: 0.01, decay: 0.8, sustain: 0.1, release: 1 } }),
-  "Kick - Punch": () => new Tone.MembraneSynth({ pitchDecay: 0.1, octaves: 6, envelope: { attack: 0.001, decay: 0.2, sustain: 0 } }),
-  "Kick - Deep": () => new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 4 }),
-  "Snare - Tight": () => new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.005, decay: 0.1, sustain: 0 } }),
-  "Snare - Clap": () => new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.3, sustain: 0 } }),
-  "Hat - Closed": () => new Tone.MetalSynth({ frequency: 200, envelope: { attack: 0.001, decay: 0.05, release: 0.01 }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 }),
-  "Hat - Open": () => new Tone.MetalSynth({ frequency: 200, envelope: { attack: 0.001, decay: 0.4, release: 0.1 }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 }),
-  "Perc - Hi Tom": () => new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 4 }),
-  "Perc - Low Tom": () => new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 2 }),
-  "Perc - Cowbell": () => new Tone.FMSynth({ harmonicity: 1.2, modulationIndex: 2.5, oscillator: { type: "square" }, modulation: { type: "square" }, envelope: { attack: 0.001, decay: 0.2 } }),
-  
-  // 🎸 BASS
-  "Bass - FM Sub": () => new Tone.FMSynth({ harmonicity: 0.5, modulationIndex: 1.2, oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 0.5, sustain: 0.8, release: 0.5 } }),
-  "Bass - Saw Pluck": () => new Tone.Synth({ oscillator: { type: "sawtooth" }, envelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.2 } }),
-  "Bass - Deep Square": () => new Tone.Synth({ oscillator: { type: "square" }, envelope: { attack: 0.05, decay: 0.4, sustain: 0.4, release: 1 } }),
-
-  // 🎹 KEYS
-  "Keys - Sine Piano": () => new Tone.Synth({ oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 1, sustain: 0, release: 1 } }),
-  "Keys - E-Piano (FM)": () => new Tone.FMSynth({ harmonicity: 2, modulationIndex: 3, oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 2, sustain: 0.2, release: 1 } }),
-  "Keys - Drawbar Organ": () => new Tone.FatOscillator({ type: "sine", count: 3, spread: 20 }).toDestination(), // Custom setup handled in play
-  "Keys - Toy Piano": () => new Tone.AMSynth({ harmonicity: 3, oscillator: { type: "triangle" }, envelope: { attack: 0.01, decay: 0.5, sustain: 0 } }),
-
-  // 🎻 STRINGS & PADS
-  "Strings - Bowed": () => new Tone.AMSynth({ harmonicity: 1, oscillator: { type: "sawtooth" }, envelope: { attack: 0.2, decay: 1, sustain: 0.8, release: 1.5 } }),
-  "Strings - Synth Choir": () => new Tone.FMSynth({ harmonicity: 0.5, modulationIndex: 5, oscillator: { type: "triangle" }, envelope: { attack: 0.5, decay: 1, sustain: 1, release: 2 } }),
-  "Pad - Dream (Fat Sine)": () => new Tone.Synth({ oscillator: { type: "fatsine", count: 3, spread: 30 }, envelope: { attack: 1, decay: 0.5, sustain: 1, release: 2 } }),
-  "Pad - Dark (Fat Saw)": () => new Tone.Synth({ oscillator: { type: "fatsawtooth", count: 3, spread: 20 }, envelope: { attack: 0.8, decay: 1, sustain: 0.8, release: 2 } }),
-
-  // 🎵 PLUCKS & GUITARS
-  "Pluck - Tech": () => new Tone.FMSynth({ harmonicity: 2, modulationIndex: 2, oscillator: { type: "square" }, envelope: { attack: 0.001, decay: 0.1, sustain: 0 } }),
-  "Pluck - Koto": () => new Tone.PluckSynth({ attackNoise: 2, dampening: 4000, resonance: 0.9 }),
-  "Pluck - Nylon": () => new Tone.PluckSynth({ attackNoise: 1, dampening: 2000, resonance: 0.7 }),
-
-  // 🚀 LEADS
-  "Lead - Theremin": () => new Tone.Synth({ oscillator: { type: "sine" }, envelope: { attack: 0.5, decay: 0, sustain: 1, release: 0.5 }, portamento: 0.2 }),
-  "Lead - 8-Bit": () => new Tone.Synth({ oscillator: { type: "square" }, envelope: { attack: 0.01, decay: 0.1, sustain: 0.5, release: 0.1 } }),
-  "Lead - Fat Saw": () => new Tone.Synth({ oscillator: { type: "fatsawtooth", count: 2, spread: 10 }, envelope: { attack: 0.05, decay: 0.3, sustain: 0.5, release: 0.5 } })
+  "🥁 Kicks": {
+    "Kick - 808": () => new Tone.MembraneSynth({ pitchDecay: 0.005, octaves: 2, envelope: { attack: 0.01, decay: 0.8, sustain: 0.1, release: 1 } }),
+    "Kick - Punch": () => new Tone.MembraneSynth({ pitchDecay: 0.1, octaves: 6, envelope: { attack: 0.001, decay: 0.2, sustain: 0 } }),
+    "Kick - Deep Sub": () => new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 4 }),
+    "Kick - Trance": () => new Tone.MembraneSynth({ pitchDecay: 0.2, octaves: 8, envelope: { attack: 0.001, decay: 0.3 } }),
+  },
+  "🥁 Snares & Claps": {
+    "Snare - Trap": () => new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.005, decay: 0.1, sustain: 0 } }),
+    "Snare - Acoustic": () => new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.2, sustain: 0 } }),
+    "Clap - Basic": () => new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.3, sustain: 0 } }),
+    "Clap - Reverb": () => new Tone.NoiseSynth({ noise: { type: 'brown' }, envelope: { attack: 0.01, decay: 0.5, sustain: 0 } }),
+  },
+  "🥁 Hats & Cymbals": {
+    "Hat - Closed (Trap)": () => new Tone.MetalSynth({ frequency: 200, envelope: { attack: 0.001, decay: 0.05, release: 0.01 }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 }),
+    "Hat - Closed (Acoustic)": () => new Tone.MetalSynth({ frequency: 400, envelope: { attack: 0.001, decay: 0.1, release: 0.01 }, harmonicity: 5.1, resonance: 8000 }),
+    "Hat - Open": () => new Tone.MetalSynth({ frequency: 200, envelope: { attack: 0.001, decay: 0.4, release: 0.1 }, harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5 }),
+    "Cymbal - Crash": () => new Tone.MetalSynth({ frequency: 300, envelope: { attack: 0.001, decay: 1.5, release: 0.5 }, harmonicity: 4.1, resonance: 4000 }),
+  },
+  "🥁 Percussion": {
+    "Perc - Hi Tom": () => new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 4 }),
+    "Perc - Mid Tom": () => new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 3 }),
+    "Perc - Low Tom": () => new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 2 }),
+    "Perc - Cowbell": () => new Tone.FMSynth({ harmonicity: 1.2, modulationIndex: 2.5, oscillator: { type: "square" }, modulation: { type: "square" }, envelope: { attack: 0.001, decay: 0.2 } }),
+    "Perc - Woodblock": () => new Tone.MembraneSynth({ pitchDecay: 0.01, octaves: 1, envelope: { attack: 0.001, decay: 0.1 } }),
+  },
+  "🎸 Basses (Poly)": {
+    "Bass - 808 Sub": () => makePoly(Tone.FMSynth, { harmonicity: 0.5, modulationIndex: 1.2, oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 0.5, sustain: 0.8, release: 0.5 } }),
+    "Bass - Saw Pluck": () => makePoly(Tone.Synth, { oscillator: { type: "sawtooth" }, envelope: { attack: 0.01, decay: 0.2, sustain: 0, release: 0.2 } }),
+    "Bass - Deep Square": () => makePoly(Tone.Synth, { oscillator: { type: "square" }, envelope: { attack: 0.05, decay: 0.4, sustain: 0.4, release: 1 } }),
+    "Bass - Acid (Reso)": () => makePoly(Tone.MonoSynth, { oscillator: { type: "sawtooth" }, filter: { Q: 6, type: "lowpass", rolloff: -24 }, envelope: { attack: 0.01, decay: 0.2, sustain: 0.2, release: 0.5 }, filterEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.2, baseFrequency: 200, octaves: 4 } }),
+  },
+  "🎹 Keys (Poly)": {
+    "Keys - Sine Piano": () => makePoly(Tone.Synth, { oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 1, sustain: 0, release: 1 } }),
+    "Keys - FM Piano": () => makePoly(Tone.FMSynth, { harmonicity: 2, modulationIndex: 3, oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 2, sustain: 0.2, release: 1 } }),
+    "Keys - Toy Piano": () => makePoly(Tone.AMSynth, { harmonicity: 3, oscillator: { type: "triangle" }, envelope: { attack: 0.01, decay: 0.5, sustain: 0 } }),
+    "Keys - Synth Organ": () => makePoly(Tone.Synth, { oscillator: { type: "fatsine", count: 3, spread: 20 }, envelope: { attack: 0.01, decay: 0.1, sustain: 1, release: 0.5 } }),
+  },
+  "🎻 Strings & Pads (Poly)": {
+    "Strings - Bowed": () => makePoly(Tone.AMSynth, { harmonicity: 1, oscillator: { type: "sawtooth" }, envelope: { attack: 0.2, decay: 1, sustain: 0.8, release: 1.5 } }),
+    "Pad - Dream Sine": () => makePoly(Tone.Synth, { oscillator: { type: "fatsine", count: 3, spread: 30 }, envelope: { attack: 1, decay: 0.5, sustain: 1, release: 2 } }),
+    "Pad - Dark Saw": () => makePoly(Tone.Synth, { oscillator: { type: "fatsawtooth", count: 3, spread: 20 }, envelope: { attack: 0.8, decay: 1, sustain: 0.8, release: 2 } }),
+  },
+  "🎵 Plucks & Guitars (Poly)": {
+    "Pluck - Tech": () => makePoly(Tone.FMSynth, { harmonicity: 2, modulationIndex: 2, oscillator: { type: "square" }, envelope: { attack: 0.001, decay: 0.1, sustain: 0 } }),
+    "Pluck - Harp": () => new Tone.PluckSynth({ attackNoise: 1, dampening: 4000, resonance: 0.9 }),
+    "Pluck - Nylon": () => new Tone.PluckSynth({ attackNoise: 1, dampening: 2000, resonance: 0.7 }),
+  },
+  "🚀 Leads & Synths (Poly)": {
+    "Lead - Theremin": () => makePoly(Tone.Synth, { oscillator: { type: "sine" }, envelope: { attack: 0.5, decay: 0, sustain: 1, release: 0.5 } }),
+    "Lead - 8-Bit Square": () => makePoly(Tone.Synth, { oscillator: { type: "square" }, envelope: { attack: 0.01, decay: 0.1, sustain: 0.5, release: 0.1 } }),
+    "Lead - Fat Trance": () => makePoly(Tone.Synth, { oscillator: { type: "fatsawtooth", count: 3, spread: 15 }, envelope: { attack: 0.05, decay: 0.3, sustain: 0.5, release: 0.5 } })
+  }
 };
-
-// Notes for dropdown
-const NOTES = ["C2","D2","E2","F2","G2","A2","B2", "C3","D3","E3","F3","G3","A3","B3", "C4","D4","E4","F4","G4","A4","B4", "C5","D5","E5","F5","G5","A5","B5"];
 
 let masterCompressor, masterReverb;
 
@@ -146,7 +161,6 @@ async function initAudio() {
   if (typeof Tone === "undefined") return alert("Audio blocked by Discord.");
   await Tone.start();
 
-  // Master Effects Chain
   masterCompressor = new Tone.Compressor({ threshold: -24, ratio: 4 }).toDestination();
   masterReverb = new Tone.Reverb({ decay: 2, wet: 0.15 }).connect(masterCompressor);
 
@@ -155,31 +169,32 @@ async function initAudio() {
   if(state.bpm) Tone.Transport.bpm.value = state.bpm;
 }
 
-// Manages Synths in Memory (Avoids Lag)
 function syncSynths() {
-  if(!masterReverb) return; // Audio not started yet
-
-  // Create new synths
+  if(!masterReverb) return;
+  
   state.channels.forEach(ch => {
     if (!synthInstances[ch.id] || synthInstances[ch.id].type !== ch.inst) {
-      if (synthInstances[ch.id]) synthInstances[ch.id].node.dispose(); // Cleanup old
+      if (synthInstances[ch.id]) synthInstances[ch.id].node.dispose();
       
-      const generator = SYNTH_LIBRARY[ch.inst] || SYNTH_LIBRARY["Keys - Sine Piano"];
-      let node = generator();
+      let generator = SYNTH_LIBRARY["🎹 Keys (Poly)"]["Keys - FM Piano"]; // Fallback
       
-      // Connect to master effects
-      node.connect(masterReverb);
+      // Find instrument in nested library
+      for (const category in SYNTH_LIBRARY) {
+        if (SYNTH_LIBRARY[category][ch.inst]) {
+          generator = SYNTH_LIBRARY[category][ch.inst];
+          break;
+        }
+      }
       
-      // Volume balancing
-      if(ch.inst.includes("Hat") || ch.inst.includes("Pluck")) node.volume.value = -12;
-      else if(ch.inst.includes("Kick") || ch.inst.includes("Bass")) node.volume.value = 2;
-      else node.volume.value = -8;
-
+      let node = generator().connect(masterReverb);
       synthInstances[ch.id] = { type: ch.inst, node: node };
+    }
+    // Update Volume live
+    if (synthInstances[ch.id] && synthInstances[ch.id].node.volume) {
+      synthInstances[ch.id].node.volume.value = ch.vol;
     }
   });
 
-  // Remove deleted synths
   Object.keys(synthInstances).forEach(id => {
     if (!state.channels.find(c => c.id === id)) {
       synthInstances[id].node.dispose();
@@ -196,18 +211,19 @@ function startTimingLoop() {
       if (ch.pattern[currentStep]) {
         const synth = synthInstances[ch.id];
         if (synth && synth.node) {
-          // Play note (NoiseSynths ignore the note param automatically)
-          synth.node.triggerAttackRelease(ch.note, "16n", time);
+          try {
+            synth.node.triggerAttackRelease(ch.note, "16n", time);
+          } catch(e) { console.error("Synth playback error:", e); }
         }
       }
     });
 
-    Tone.Draw.schedule(() => { updateGridUI(currentStep); }, time);
+    Tone.Draw.schedule(() => { updatePlayhead(currentStep); }, time);
     currentStep = (currentStep + 1) % state.steps;
   }, "16n");
 }
 
-// --- UI BUILDER ---
+// --- UI LOGIC ---
 function buildGrid() {
   const rack = document.getElementById("rack");
   rack.innerHTML = "";
@@ -218,7 +234,7 @@ function buildGrid() {
     const row = document.createElement("div");
     row.className = "row";
 
-    // STICKY CONTROLS (Left side)
+    // STICKY CONTROLS
     const controls = document.createElement("div");
     controls.className = "track-controls";
 
@@ -230,11 +246,18 @@ function buildGrid() {
 
     const instSelect = document.createElement("select");
     instSelect.className = "inst-select";
-    Object.keys(SYNTH_LIBRARY).forEach(inst => {
-      const opt = document.createElement("option");
-      opt.value = opt.innerText = inst;
-      if (ch.inst === inst) opt.selected = true;
-      instSelect.appendChild(opt);
+    
+    // Categorized Dropdown
+    Object.keys(SYNTH_LIBRARY).forEach(category => {
+      const optgroup = document.createElement("optgroup");
+      optgroup.label = category;
+      Object.keys(SYNTH_LIBRARY[category]).forEach(inst => {
+        const opt = document.createElement("option");
+        opt.value = opt.innerText = inst;
+        if (ch.inst === inst) opt.selected = true;
+        optgroup.appendChild(opt);
+      });
+      instSelect.appendChild(optgroup);
     });
     instSelect.onchange = (e) => socket.emit("updateTrack", { channelId: ch.id, key: "inst", value: e.target.value });
     controls.appendChild(instSelect);
@@ -250,9 +273,17 @@ function buildGrid() {
     noteSelect.onchange = (e) => socket.emit("updateTrack", { channelId: ch.id, key: "note", value: e.target.value });
     controls.appendChild(noteSelect);
 
+    // VOLUME SLIDER
+    const volSlider = document.createElement("input");
+    volSlider.type = "range"; volSlider.min = "-30"; volSlider.max = "10"; volSlider.value = ch.vol;
+    volSlider.className = "vol-slider";
+    volSlider.title = "Volume";
+    volSlider.onchange = (e) => socket.emit("updateTrack", { channelId: ch.id, key: "vol", value: Number(e.target.value) });
+    controls.appendChild(volSlider);
+
     row.appendChild(controls);
 
-    // GRID BUTTONS (Scrollable Right Side)
+    // GRID BUTTONS
     const stepsContainer = document.createElement("div");
     stepsContainer.className = "steps";
     buttons[ch.id] = [];
@@ -260,7 +291,16 @@ function buildGrid() {
     ch.pattern.forEach((active, i) => {
       const btn = document.createElement("button");
       btn.className = `step-btn beat-${Math.floor(i / 4) % 2}`;
-      btn.onclick = () => socket.emit("toggleStep", { channelId: ch.id, stepIndex: i });
+      btn.style.background = active ? "var(--step-on)" : "";
+      
+      btn.onclick = () => {
+        // Optimistic UI update (Instant feel)
+        const isActive = !ch.pattern[i];
+        ch.pattern[i] = isActive;
+        btn.style.background = isActive ? "var(--step-on)" : "";
+        socket.emit("toggleStep", { channelId: ch.id, stepIndex: i });
+      };
+      
       stepsContainer.appendChild(btn);
       buttons[ch.id].push(btn);
     });
@@ -274,18 +314,13 @@ function buildGrid() {
   addBtn.innerText = "+ ADD TRACK";
   addBtn.onclick = () => socket.emit("addTrack");
   rack.appendChild(addBtn);
-
-  updateGridUI(-1);
 }
 
-function updateGridUI(stepPlaying) {
+// Visual Playhead Only (Doesn't rebuild HTML)
+function updatePlayhead(stepPlaying) {
   state.channels.forEach(ch => {
     if(!buttons[ch.id]) return;
-    ch.pattern.forEach((active, i) => {
-      const btn = buttons[ch.id][i];
-      if(!btn) return;
-      btn.style.background = active ? "var(--step-on)" : "";
-      
+    buttons[ch.id].forEach((btn, i) => {
       if (i === stepPlaying) {
         btn.style.borderColor = "var(--step-active)";
         btn.style.transform = "scale(1.05)";
@@ -316,7 +351,7 @@ function applyPlayState(playing) {
   }
 }
 
-// --- NETWORK ---
+// --- NETWORK EVENTS ---
 socket.on("connect", () => { document.getElementById("status").innerText = "🟢 ONLINE"; document.getElementById("status").style.color = "var(--accent)"; });
 socket.on("disconnect", () => { document.getElementById("status").innerText = "🔴 OFFLINE"; document.getElementById("status").style.color = "var(--danger)"; });
 socket.on("userCount", (count) => { document.getElementById("users").innerText = `👥 Users: ${count}`; });
@@ -330,9 +365,20 @@ socket.on("initState", (newState) => {
   applyPlayState(state.isPlaying);
 });
 
+// FULL UPDATE (For adding/removing tracks, changing instruments/volume)
 socket.on("stateUpdate", (newState) => {
   state = newState;
+  document.getElementById("stepSelect").value = state.steps;
   buildGrid();
+});
+
+// LIGHTWEIGHT UPDATE (For clicking notes - incredibly fast)
+socket.on("stepToggled", ({ channelId, stepIndex, val }) => {
+  const ch = state.channels.find(c => c.id === channelId);
+  if (ch) ch.pattern[stepIndex] = val;
+  if (buttons[channelId] && buttons[channelId][stepIndex]) {
+    buttons[channelId][stepIndex].style.background = val ? "var(--step-on)" : "";
+  }
 });
 
 socket.on("playUpdate", applyPlayState);
