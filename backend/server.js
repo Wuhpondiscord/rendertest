@@ -30,18 +30,25 @@ const app    = express();
 const server = http.createServer(app);
 const PORT   = process.env.PORT || 3001;
 
-app.use(cors({ origin: "*" }));  // Discord's proxy rewrites the origin — wildcard required
+app.use(cors({
+  origin: [
+    "https://wuhpondiscord.github.io",
+    /\.discordsays\.com$/,           // all Discord Activity subdomains
+  ],
+  methods     : ["GET", "POST"],
+  credentials : true,
+}));
 app.use(express.json());
 
 const io = new Server(server, {
-  // Discord's proxy forwards the full path unchanged, so connections from Discord
-  // arrive at /api/socket.io instead of /socket.io.
-  // Setting path to /api/socket.io makes it work through the proxy.
-  // Direct browser connections also use this same path via the client SOCKET_PATH config.
   path: "/api/socket.io",
   cors: {
-    origin : "*",
-    methods: ["GET", "POST"],
+    origin: [
+      "https://wuhpondiscord.github.io",
+      /\.discordsays\.com$/,
+    ],
+    methods     : ["GET", "POST"],
+    credentials : true,
   },
   allowEIO3    : true,
   pingTimeout  : 60000,
