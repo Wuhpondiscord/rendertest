@@ -122,13 +122,13 @@ function findLayer(st, beatId, layerId) {
 // ════════════════════════════════════════════════════════════════
 //  HTTP ROUTES
 // ════════════════════════════════════════════════════════════════
-// Serve Discord SDK UMD build through our proxy so it bypasses Discord's CSP.
-// External CDN script tags are blocked; this route serves it from same origin.
+// Serve Discord SDK ESM build through our proxy.
+// Dynamic import() of an external URL is blocked by Discord's CSP.
+// Serving from same-origin /api/sdk bypasses that restriction.
 app.get("/api/sdk", async (req, res) => {
   try {
-    const r = await fetch(
-      "https://cdn.jsdelivr.net/npm/@discord/embedded-app-sdk@1/dist/index.js"
-    );
+    // jsdelivr's +esm endpoint converts the npm package to a browser-ready ES module
+    const r = await fetch("https://cdn.jsdelivr.net/npm/@discord/embedded-app-sdk@1/+esm");
     const text = await r.text();
     res.setHeader("Content-Type", "application/javascript");
     res.setHeader("Cache-Control", "public, max-age=3600");
