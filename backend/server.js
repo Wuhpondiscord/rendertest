@@ -122,22 +122,20 @@ function findLayer(st, beatId, layerId) {
 // ════════════════════════════════════════════════════════════════
 //  HTTP ROUTES
 // ════════════════════════════════════════════════════════════════
-// Serve the Discord Embedded App SDK through our proxy.
-// This allows the Activity to import it without CSP violations —
-// Discord blocks external CDN imports, but /api/* is whitelisted via URL mappings.
+// Serve Discord SDK UMD build through our proxy so it bypasses Discord's CSP.
+// External CDN script tags are blocked; this route serves it from same origin.
 app.get("/api/sdk", async (req, res) => {
   try {
     const r = await fetch(
-      "https://cdn.jsdelivr.net/npm/@discord/embedded-app-sdk@2/+esm",
-      { headers: { "Accept": "application/javascript" } }
+      "https://cdn.jsdelivr.net/npm/@discord/embedded-app-sdk@1/dist/index.js"
     );
     const text = await r.text();
     res.setHeader("Content-Type", "application/javascript");
     res.setHeader("Cache-Control", "public, max-age=3600");
     res.send(text);
   } catch(err) {
-    console.error("SDK proxy error:", err);
-    res.status(502).json({ error: "SDK_PROXY_FAILED" });
+    console.error("SDK proxy error:", err.message);
+    res.status(502).send("// SDK proxy failed: " + err.message);
   }
 });
 
