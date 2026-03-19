@@ -31,6 +31,7 @@
       user-select: none;
     }
 
+    /* Discord Auth Overlay */
     #loading-overlay { 
       position: fixed; inset: 0; 
       background: var(--bg); 
@@ -47,6 +48,7 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* Top Navigation */
     .top-bar { 
       background: var(--panel); 
       width: 100%; 
@@ -58,6 +60,7 @@
     .nav-group { display: flex; align-items: center; gap: 12px; }
     .project-name { font-weight: 700; font-size: 14px; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; }
     
+    /* Transport Controls */
     .transport { 
       background: var(--panel-light); 
       width: 100%; padding: 12px 20px; 
@@ -78,7 +81,9 @@
       transition: 0.15s cubic-bezier(0.4, 0, 0.2, 1); outline: none; 
     }
     button:hover { background: var(--border-highlight); border-color: var(--text-muted); }
-    #playBtn { background: var(--accent); color: #fff; border: none; width: 100px; }
+
+    #playBtn { background: var(--accent); color: #fff; border: none; width: 100px; font-size: 13px; }
+    #recBtn { color: var(--record); border-color: var(--record); }
     #recBtn.recording { background: var(--record); color: #fff; animation: pulse 1.5s infinite; }
     @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
@@ -110,7 +115,8 @@
       z-index: 10; border-right: 2px solid var(--border); 
       width: 300px; box-sizing: border-box;
     }
-    .track-author { font-size: 10px; color: var(--accent); font-weight: 800; }
+    .track-header { display: flex; justify-content: space-between; align-items: center; }
+    .track-author { font-size: 10px; color: var(--accent); font-weight: 800; letter-spacing: 0.5px; }
     
     .track-row { display: flex; align-items: center; gap: 8px; }
     .vol-container { 
@@ -194,10 +200,12 @@
 const BACKEND_URL = "https://beat-backend-5nnu.onrender.com";
 const CLIENT_ID = "1484065774606876672";
 
+// Correct global reference for Discord SDK
+const DiscordSDKClass = window.discordSdk ? window.discordSdk.DiscordSDK : (window.DiscordSDK || null);
 const socket = io(BACKEND_URL, { transports: ["websocket"] });
-const discordSdk = new discord.DiscordSDK(CLIENT_ID);
 
-let currentUser = { id: 'local-' + Math.random(), username: "Guest" };
+let discordSdk = DiscordSDKClass ? new DiscordSDKClass(CLIENT_ID) : null;
+let currentUser = { id: 'local-' + Math.random().toString(36).substr(2, 9), username: "Guest" };
 let synthInstances = {};
 let buttons = {};
 let state = { projectId: "", projectName: "Untitled", bpm: 120, steps: 16, channels: [], isPlaying: false };
@@ -235,6 +243,8 @@ const SYNTH_LIBRARY = {
 
 async function setup() {
   try {
+    if (!discordSdk) throw new Error("SDK Not Found");
+
     document.getElementById("load-status").innerText = "AUTHORIZING WITH DISCORD...";
     await discordSdk.ready();
     const { code } = await discordSdk.commands.authorize({
@@ -246,16 +256,19 @@ async function setup() {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code }),
     });
-    const { access_token } = await response.json();
-    const auth = await discordSdk.commands.authenticate({ access_token });
+    
+    const tokenData = await response.json();
+    const auth = await discordSdk.commands.authenticate({ access_token: tokenData.access_token });
 
     currentUser = { id: auth.user.id, username: auth.user.username || auth.user.global_name };
     finishSetup();
   } catch (e) {
-    console.warn("Discord SDK failed or not in Discord environment.");
+    console.warn("Discord SDK failed or not in Discord. Entering Standalone Mode.");
     document.getElementById("load-status").innerHTML = `
-      <p style="color: #ffcc00; margin-bottom: 15px;">STANDALONE MODE</p>
-      <button onclick="finishSetup()" style="background: var(--accent); padding: 15px 40px; border: none; font-size: 16px;">START STUDIO</button>
+      <div style="text-align:center">
+        <p style="color: #ffcc00; margin-bottom: 15px;">STANDALONE MODE</p>
+        <button onclick="finishSetup()" style="background: var(--accent); padding: 15px 40px; border: none; font-size: 16px; border-radius: 8px; color: white;">START STUDIO</button>
+      </div>
     `;
   }
 }
@@ -429,6 +442,7 @@ function clearGrid() { socket.emit("clearGrid"); }
 function saveProject() { const n = prompt("Name your project:", state.projectName); if(n) socket.emit("saveProject", n); }
 function loadProject(v) { if(v) socket.emit("loadProject", v); }
 
+// Boot
 setup();
 </script>
 </body>
