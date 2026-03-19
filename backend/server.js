@@ -1,192 +1,329 @@
+/**
+ * Discord Studio Pro — Backend Server
+ * ─────────────────────────────────────────────────────────────────
+ * Features:
+ *  - Real-time collaboration via Socket.IO
+ *  - Discord OAuth2 token exchange
+ *  - Multiple beat patterns per project
+ *  - Per-track BPM multiplier + volume
+ *  - Project save / load / rename (in-memory)
+ *  - Per-socket user colors
+ *  - Toast broadcast for collaborative feedback
+ * ─────────────────────────────────────────────────────────────────
+ * Required env vars:
+ *   CLIENT_ID             — Discord app client ID
+ *   DISCORD_CLIENT_SECRET — Discord app client secret
+ *
+ * Optional:
+ *   PORT                  — defaults to 3001
+ */
+
 const express = require("express");
-const http = require("http");
+const http    = require("http");
 const { Server } = require("socket.io");
-const crypto = require("crypto");
-const cors = require("cors");
+const crypto  = require("crypto");
+const cors    = require("cors");
 
-// Discord Docs require node-fetch or similar for server-side token exchange
-const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+// Dynamic import shim for node-fetch
+const fetch = (...args) =>
+  import("node-fetch").then(({ default: f }) => f(...args));
 
-const app = express();
+const app    = express();
 const server = http.createServer(app);
+const PORT   = process.env.PORT || 3001;
 
-// Use Port from environment (for Render/Heroku) or 3001 for local
-const PORT = process.env.PORT || 3001;
-
+// ─── MIDDLEWARE ──────────────────────────────────────────────────
 app.use(cors({ origin: "*" }));
 app.use(express.json());
 
-/**
- * DISCORD DOCS COMPLIANCE: Socket.io Configuration
- * We use 'websocket' and 'polling' to ensure stability through the Discord Proxy.
- */
 const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  },
-  path: "/socket.io"
+  cors: { origin: "*", methods: ["GET", "POST"] },
 });
 
-/**
- * MULTIPLAYER INSTANCE MANAGEMENT
- * Discord Docs: "Instance IDs are generated when a user launches an application. 
- * Any users joining the same application will receive the same instanceId."
- */
-let instances = {}; // Store states keyed by discordSdk.instanceId
-let savedProjects = {}; // Global library of saved beats
+// ─── HELPERS ─────────────────────────────────────────────────────
+function makeId() {
+  return crypto.randomUUID();
+}
 
-/**
- * DISCORD AUTHENTICATION (Step 5 of Discord Docs)
- * Securely exchange the 'code' from the frontend for an 'access_token'.
- */
+function makePattern(name, steps) {
+  return {
+    id      : "pat_" + makeId(),
+    name    : name || "Beat 1",
+    channels: [],
+  };
+}
+
+function makeTrack(authorName, steps) {
+  return {
+    id      : "track_" + makeId(),
+    author  : authorName || "Guest",
+    inst    : "Keys - Grand Piano",
+    note    : "C4",
+    vol     : -6,
+    bpmMult : 1,   // 0.5 = half speed, 1 = normal, 2 = double
+    pattern : Array(steps).fill(false),
+  };
+}
+
+function cloneState(s) {
+  return JSON.parse(JSON.stringify(s));
+}
+
+// ─── STATE ───────────────────────────────────────────────────────
+const initialPattern = makePattern("Beat 1", 16);
+
+let state = {
+  projectName   : "Untitled Session",
+  bpm           : 120,
+  steps         : 16,
+  isPlaying     : false,
+  channels      : [],          // tracks in the ACTIVE pattern (kept in sync)
+  patterns      : [initialPattern],
+  activePattern : initialPattern.id,
+};
+
+let savedProjects = {};  // { name: clonedState }
+let userCount     = 0;
+let connectedUsers = {}; // { socketId: { username, color } }
+
+// Get the currently active pattern object from state
+function getActivePattern() {
+  return state.patterns.find(p => p.id === state.activePattern) || state.patterns[0];
+}
+
+// Sync state.channels ↔ active pattern channels (they reference the same array)
+function syncChannels() {
+  const pat = getActivePattern();
+  state.channels = pat.channels;
+}
+
+// ─── HTTP ROUTES ─────────────────────────────────────────────────
+
+// Discord client ID (safe to expose publicly)
+app.get("/api/config", (req, res) => {
+  const clientId = process.env.CLIENT_ID || process.env.VITE_CLIENT_ID;
+  if (!clientId) {
+    console.error("CLIENT_ID env var is not set!");
+    return res.status(500).json({ error: "Server misconfiguration: CLIENT_ID missing" });
+  }
+  res.json({ clientId });
+});
+
+// Discord OAuth2 token exchange
 app.post("/api/token", async (req, res) => {
   const { code } = req.body;
-  if (!code) return res.status(400).send({ error: "Missing code" });
+  if (!code) return res.status(400).json({ error: "Missing code" });
+
+  const clientId     = process.env.CLIENT_ID || process.env.VITE_CLIENT_ID;
+  const clientSecret = process.env.DISCORD_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    return res.status(500).json({ error: "Server misconfiguration: OAuth credentials missing" });
+  }
 
   try {
-    const response = await fetch(`https://discord.com/api/oauth2/token`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: process.env.VITE_CLIENT_ID,
-        client_secret: process.env.DISCORD_CLIENT_SECRET,
-        grant_type: "authorization_code",
-        code: code,
+    const response = await fetch("https://discord.com/api/oauth2/token", {
+      method  : "POST",
+      headers : { "Content-Type": "application/x-www-form-urlencoded" },
+      body    : new URLSearchParams({
+        client_id    : clientId,
+        client_secret: clientSecret,
+        grant_type   : "authorization_code",
+        code,
       }),
     });
-    
     const data = await response.json();
+    if (data.error) {
+      console.error("Discord token error:", data);
+      return res.status(400).json({ error: data.error_description || data.error });
+    }
     res.json(data);
   } catch (err) {
     console.error("Discord Auth Error:", err);
-    res.status(500).send({ error: "Auth exchange failed" });
+    res.status(500).json({ error: "Failed to exchange token with Discord" });
   }
 });
 
-app.get("/", (req, res) => res.send("Discord Studio Server - Documentation Compliant"));
+app.get("/", (req, res) =>
+  res.send(`<pre>Discord Studio Pro — Server Online (port ${PORT})\nUsers: ${userCount}</pre>`)
+);
 
-// Helper to create a fresh state for a new room/instance
-const createInitialState = (instanceId) => ({
-  instanceId,
-  projectName: "New Jam",
-  bpm: 120,
-  steps: 16,
-  isPlaying: false,
-  channels: []
-});
-
+// ─── SOCKET.IO ───────────────────────────────────────────────────
 io.on("connection", (socket) => {
-  /**
-   * DISCORD DOCS COMPLIANCE: Instance Identification
-   * We pass the instanceId from the frontend during the handshake.
-   */
-  const instanceId = socket.handshake.query.instanceId;
-  
-  if (!instanceId) {
-    console.log("Connection rejected: No instanceId provided.");
-    return socket.disconnect();
-  }
+  userCount++;
+  connectedUsers[socket.id] = { username: "Guest" };
+  io.emit("userCount", userCount);
 
-  socket.join(instanceId);
-
-  // Initialize instance state if it doesn't exist
-  if (!instances[instanceId]) {
-    instances[instanceId] = createInitialState(instanceId);
-  }
-
-  const state = instances[instanceId];
-
-  // Send the specific instance state to the joining user
-  socket.emit("initState", state);
+  // Send full state to new user
+  syncChannels();
+  socket.emit("initState", cloneState(state));
   socket.emit("projectList", Object.keys(savedProjects));
 
-  // --- Track Management ---
-
-  socket.on("addTrack", (userData) => {
-    const newTrack = {
-      id: crypto.randomUUID(),
-      author: userData.username || "Unknown",
-      color: userData.color || "#00d4ff",
-      inst: "Keys - Grand Piano",
-      note: "C4",
-      vol: -12,
-      speed: 1.0, // Per-track BPM multiplier
-      pattern: Array(state.steps).fill(false),
-      sampleUrl: null // Placeholder for custom audio
-    };
-    state.channels.push(newTrack);
-    io.to(instanceId).emit("stateUpdate", state);
+  // ── STEP TOGGLE ──────────────────────────────────────────────
+  socket.on("toggleStep", ({ channelId, stepIndex, val }) => {
+    const pat = getActivePattern();
+    const ch  = pat.channels.find(c => c.id === channelId);
+    if (!ch || stepIndex < 0 || stepIndex >= ch.pattern.length) return;
+    ch.pattern[stepIndex] = val;
+    syncChannels();
+    socket.broadcast.emit("stepToggled", { channelId, stepIndex, val });
   });
 
-  socket.on("removeTrack", (trackId) => {
-    state.channels = state.channels.filter(t => t.id !== trackId);
-    io.to(instanceId).emit("stateUpdate", state);
+  // ── ADD TRACK ────────────────────────────────────────────────
+  socket.on("addTrack", (authorName) => {
+    const pat   = getActivePattern();
+    const track = makeTrack(authorName, state.steps);
+    pat.channels.push(track);
+    syncChannels();
+    io.emit("stateUpdate", cloneState(state));
   });
 
-  // --- Real-time Sync ---
-
-  socket.on("toggleStep", ({ trackId, stepIndex, val }) => {
-    const track = state.channels.find(t => t.id === trackId);
-    if (track) {
-      track.pattern[stepIndex] = val;
-      // Broadcast to others in the same Discord Instance
-      socket.to(instanceId).emit("stepToggled", { trackId, stepIndex, val });
-    }
+  // ── REMOVE TRACK ─────────────────────────────────────────────
+  socket.on("removeTrack", (channelId) => {
+    const pat = getActivePattern();
+    pat.channels = pat.channels.filter(c => c.id !== channelId);
+    syncChannels();
+    io.emit("stateUpdate", cloneState(state));
   });
 
-  socket.on("updateTrackParam", ({ trackId, key, value }) => {
-    const track = state.channels.find(t => t.id === trackId);
-    if (track) {
-      track[key] = value;
-      // Sync parameters (Volume, Speed/BPM, Instrument)
-      socket.to(instanceId).emit("trackParamUpdated", { trackId, key, value });
-    }
+  // ── UPDATE TRACK PARAM ───────────────────────────────────────
+  // Handles: inst, note, vol, bpmMult
+  socket.on("updateTrackParam", ({ channelId, key, value }) => {
+    const pat = getActivePattern();
+    const ch  = pat.channels.find(c => c.id === channelId);
+    if (!ch) return;
+
+    const allowed = ["inst", "note", "vol", "bpmMult"];
+    if (!allowed.includes(key)) return;
+
+    ch[key] = value;
+    syncChannels();
+    // Broadcast delta to all other clients (avoids full grid rebuild for vol)
+    socket.broadcast.emit("trackParamUpdated", { channelId, key, value });
   });
 
-  // --- Transport Controls ---
-
-  socket.on("setBPM", (newBpm) => {
-    state.bpm = newBpm;
-    io.to(instanceId).emit("bpmUpdate", newBpm);
+  // ── TRANSPORT ────────────────────────────────────────────────
+  socket.on("setBPM", (bpm) => {
+    const v = Math.max(40, Math.min(220, Number(bpm)));
+    state.bpm = v;
+    io.emit("bpmUpdate", v);
   });
 
   socket.on("togglePlay", (playing) => {
-    state.isPlaying = playing;
-    io.to(instanceId).emit("playUpdate", playing);
+    state.isPlaying = !!playing;
+    io.emit("playUpdate", state.isPlaying);
   });
 
-  // --- Save/Load Persistence ---
+  socket.on("changeSteps", (newSteps) => {
+    const n = [16, 32, 64].includes(newSteps) ? newSteps : 16;
+    state.steps = n;
+    // Resize patterns for all patterns
+    state.patterns.forEach(pat => {
+      pat.channels.forEach(ch => {
+        const fresh = Array(n).fill(false);
+        for (let i = 0; i < Math.min(ch.pattern.length, n); i++) {
+          fresh[i] = ch.pattern[i];
+        }
+        ch.pattern = fresh;
+      });
+    });
+    syncChannels();
+    io.emit("stateUpdate", cloneState(state));
+  });
 
+  socket.on("clearGrid", () => {
+    const pat = getActivePattern();
+    pat.channels.forEach(ch => ch.pattern.fill(false));
+    syncChannels();
+    io.emit("stateUpdate", cloneState(state));
+  });
+
+  // ── PATTERNS ─────────────────────────────────────────────────
+  socket.on("addPattern", (name) => {
+    const pat = makePattern(name || `Beat ${state.patterns.length + 1}`, state.steps);
+    state.patterns.push(pat);
+    state.activePattern = pat.id;
+    syncChannels();
+    io.emit("stateUpdate", cloneState(state));
+    io.emit("toast", `Pattern "${pat.name}" created`);
+  });
+
+  socket.on("switchPattern", (patternId) => {
+    const pat = state.patterns.find(p => p.id === patternId);
+    if (!pat) return;
+    state.activePattern = patternId;
+    syncChannels();
+    io.emit("stateUpdate", cloneState(state));
+  });
+
+  socket.on("renamePattern", ({ patternId, name }) => {
+    const pat = state.patterns.find(p => p.id === patternId);
+    if (!pat || !name) return;
+    pat.name = name.slice(0, 32);
+    syncChannels();
+    io.emit("stateUpdate", cloneState(state));
+  });
+
+  socket.on("deletePattern", (patternId) => {
+    if (state.patterns.length <= 1) return; // always keep at least one
+    state.patterns = state.patterns.filter(p => p.id !== patternId);
+    if (state.activePattern === patternId) {
+      state.activePattern = state.patterns[0].id;
+    }
+    syncChannels();
+    io.emit("stateUpdate", cloneState(state));
+  });
+
+  // ── PROJECTS ─────────────────────────────────────────────────
   socket.on("saveProject", (name) => {
-    if (!name) return;
-    state.projectName = name;
-    // Store a snapshot of the current state
-    savedProjects[name] = JSON.parse(JSON.stringify(state));
+    if (!name || typeof name !== "string") return;
+    const safeName = name.trim().slice(0, 64);
+    state.projectName = safeName;
+    savedProjects[safeName] = cloneState(state);
     io.emit("projectList", Object.keys(savedProjects));
+    io.emit("stateUpdate", cloneState(state));
+    io.emit("toast", `Project "${safeName}" saved`);
+  });
+
+  socket.on("renameProject", (name) => {
+    if (!name || typeof name !== "string") return;
+    state.projectName = name.trim().slice(0, 64);
+    syncChannels();
+    io.emit("stateUpdate", cloneState(state));
   });
 
   socket.on("loadProject", (name) => {
-    if (savedProjects[name]) {
-      // Replace the room's current state with the saved project
-      instances[instanceId] = JSON.parse(JSON.stringify(savedProjects[name]));
-      instances[instanceId].instanceId = instanceId; // Keep the current Instance ID
-      instances[instanceId].isPlaying = false;
-      io.to(instanceId).emit("stateUpdate", instances[instanceId]);
-    }
+    if (!savedProjects[name]) return;
+    state = cloneState(savedProjects[name]);
+    state.isPlaying = false;
+    syncChannels();
+    io.emit("stateUpdate", cloneState(state));
+    io.emit("toast", `Loaded "${name}"`);
   });
 
+  // ── DISCONNECT ───────────────────────────────────────────────
   socket.on("disconnect", () => {
-    const room = io.sockets.adapter.rooms.get(instanceId);
-    if (!room || room.size === 0) {
-      // Optional: Cleanup instance from memory if everyone left
-      // delete instances[instanceId];
-    }
+    userCount = Math.max(0, userCount - 1);
+    delete connectedUsers[socket.id];
+    io.emit("userCount", userCount);
   });
 });
 
+// ─── START ───────────────────────────────────────────────────────
 server.listen(PORT, () => {
-  console.log(`\n--- Discord Activity DAW Server ---`);
-  console.log(`Instance Manager: Active`);
-  console.log(`Port: ${PORT}\n`);
+  console.log(`
+╔═══════════════════════════════════════╗
+║      Discord Studio Pro — Server      ║
+╠═══════════════════════════════════════╣
+║  URL  : http://localhost:${PORT}          ║
+║  Mode : ${process.env.NODE_ENV || "development"}                    ║
+╚═══════════════════════════════════════╝
+  `);
+
+  if (!process.env.CLIENT_ID && !process.env.VITE_CLIENT_ID) {
+    console.warn("⚠  WARNING: CLIENT_ID env var is not set. Discord auth will fail.");
+  }
+  if (!process.env.DISCORD_CLIENT_SECRET) {
+    console.warn("⚠  WARNING: DISCORD_CLIENT_SECRET env var is not set. Discord auth will fail.");
+  }
 });
