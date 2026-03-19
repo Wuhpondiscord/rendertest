@@ -9,11 +9,8 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3001;
 
-// ALLOW BOTH LOCAL TESTING AND GITHUB PAGES
-app.use(cors({
-  origin: ["https://wuhpondiscord.github.io", "http://localhost:5173", "https://127.0.0.1"],
-  methods: ["GET", "POST"]
-}));
+// OPEN CORS - This ensures the browser doesn't block the request
+app.use(cors({ origin: "*" }));
 app.use(express.json());
 
 const io = new Server(server, { 
@@ -21,13 +18,14 @@ const io = new Server(server, {
 });
 
 let savedProjects = {};
-let state = { projectId: "session_" + Date.now(), projectName: "Untitled Session", bpm: 120, steps: 16, isPlaying: false, channels: [] };
+let state = { bpm: 120, steps: 16, channels: [] };
 
-// CONFIG INJECTION
+// Config for Frontend
 app.get("/api/config", (req, res) => {
   res.json({ clientId: process.env.VITE_CLIENT_ID });
 });
 
+// Discord Token Exchange
 app.post("/api/token", async (req, res) => {
   const { code } = req.body;
   try {
@@ -51,11 +49,11 @@ app.post("/api/token", async (req, res) => {
 
 app.get("/", (req, res) => res.send("DAW Server Online"));
 
-// (Keep all your existing socket.on listeners here...)
+// Socket handlers
 io.on("connection", (socket) => {
   socket.emit("initState", state);
   socket.on("addTrack", (author) => {
-    state.channels.push({ id: "tr_" + crypto.randomUUID(), author: author || "Producer", inst: "Keys - Grand Piano", note: "C4", vol: -6, speed: 2, pattern: Array(state.steps).fill(false) });
+    state.channels.push({ id: "tr_" + crypto.randomUUID(), author: author || "Producer", inst: "Keys - Piano", note: "C4", vol: -6, speed: 2, pattern: Array(state.steps).fill(false) });
     io.emit("stateUpdate", state);
   });
   socket.on("toggleStep", ({ channelId, stepIndex, val }) => {
@@ -64,4 +62,4 @@ io.on("connection", (socket) => {
   });
 });
 
-server.listen(PORT, () => console.log("Server running on " + PORT));
+server.listen(PORT, () => console.log("Backend running on " + PORT));
