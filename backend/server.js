@@ -162,7 +162,7 @@ app.post("/api/token", async (req, res) => {
   }
 
   try {
-    console.log("TOKEN: exchanging code, clientId:", clientId.slice(0,8) + "...");
+    console.log("TOKEN: fetching discord.com/api/oauth2/token ...");
     const r = await fetch("https://discord.com/api/oauth2/token", {
       method  : "POST",
       headers : { "Content-Type": "application/x-www-form-urlencoded" },
@@ -173,19 +173,40 @@ app.post("/api/token", async (req, res) => {
         code,
       }),
     });
+
     const text = await r.text();
-    console.log("TOKEN: Discord response status:", r.status, "body:", text.slice(0,200));
+    console.log("TOKEN: status:", r.status, "body[:120]:", text.slice(0, 120).replace(/\n/g," "));
+
+    // If Discord returned non-JSON (HTML error page), report it clearly
+    if(!text.trim().startsWith("{") && !text.trim().startsWith("[")){
+      console.error("TOKEN: non-JSON response from Discord:", text.slice(0, 300));
+      return res.status(502).json({ error: "DISCORD_RETURNED_HTML", status: r.status, body: text.slice(0, 200) });
+    }
+
     const data = JSON.parse(text);
-    console.log("TOKEN: has access_token:", !!data.access_token, "error:", data.error || "none");
-    if (data.error) return res.status(400).json({ error: data.error_description || data.error });
+    if(data.error){
+      console.error("TOKEN: Discord error:", data.error, data.error_description);
+      return res.status(400).json({ error: data.error_description || data.error });
+    }
     res.json({ access_token: data.access_token });
   } catch (err) {
-    console.error("TOKEN: failed:", err.message);
+    console.error("TOKEN: fetch threw:", err.message);
     res.status(500).json({ error: "TOKEN_EXCHANGE_FAILED", detail: err.message });
   }
 });
 
-// Keep-alive: Render free tier spins down after 15min of inactivity.
+// Network test — verify Render can reach discord.com outbound
+// Hit /api/nettest in browser to check: should return {"ok":true,"status":200}
+app.get("/api/nettest", async (req, res) => {
+  try{
+    const r = await fetch("https://discord.com/api/v10/applications/@me", {
+      headers: { "Authorization": "Bot placeholder" }
+    });
+    res.json({ ok: true, status: r.status, reachable: true });
+  }catch(err){
+    res.json({ ok: false, error: err.message, reachable: false });
+  }
+});
 const SELF_URL = process.env.RENDER_EXTERNAL_URL;
 if(SELF_URL){
   setInterval(async()=>{
