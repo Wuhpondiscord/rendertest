@@ -19,12 +19,11 @@
     
     body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; user-select: none; height: 100vh; overflow: hidden; }
 
-    #start-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(9,9,11,0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; }
+    #start-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(9,9,11,0.98); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; }
     #start-overlay h1 { color: var(--accent); margin-bottom: 20px; font-weight: 300; letter-spacing: 2px;}
     
-    .start-btn { background: var(--border-highlight); color: var(--text-muted); border: none; padding: 12px 30px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: not-allowed; transition: 0.2s; }
-    .start-btn.ready { background: var(--accent); color: #000; cursor: pointer; }
-    .start-btn.ready:hover { transform: scale(1.05); }
+    .start-btn { background: var(--accent); color: #000; border: none; padding: 12px 30px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: 0.2s; }
+    .start-btn:hover { transform: scale(1.05); }
 
     .top-bar { background: var(--panel); width: 100%; border-bottom: 1px solid var(--border); padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; }
     .nav-group { display: flex; align-items: center; gap: 10px; }
@@ -38,42 +37,36 @@
     button, select { background: var(--panel); color: var(--text); border: 1px solid var(--border); padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600; transition: 0.1s; outline: none; }
     button:hover, select:hover { background: var(--border-highlight); }
     #playBtn { background: var(--accent); color: #000; border: none; width: 80px;}
-    #recBtn { background: var(--panel); color: var(--record); border-color: var(--record); width: 120px; }
-    #recBtn.recording { background: var(--record); color: #fff; animation: pulse 1s infinite; }
-    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+    #recBtn { background: var(--panel); color: var(--record); border-color: var(--record); width: 140px; }
+    #recBtn.recording { background: var(--record); color: #fff; border: none; }
 
     .control-group { display: flex; align-items: center; gap: 8px; background: var(--bg); padding: 4px 12px; border-radius: 4px; border: 1px solid var(--border); }
     .control-group label { font-size: 10px; color: var(--text-muted); font-weight: bold; letter-spacing: 1px;}
-    input[type="range"] { accent-color: var(--accent); height: 4px; background: var(--border); border-radius: 2px; outline: none; }
 
     .channel-rack-container { width: 100%; height: calc(100vh - 110px); background: var(--bg); overflow-x: auto; overflow-y: auto; padding: 20px; box-sizing: border-box;}
     .channel-rack-container::-webkit-scrollbar { width: 10px; height: 10px; }
-    .channel-rack-container::-webkit-scrollbar-track { background: var(--bg); }
     .channel-rack-container::-webkit-scrollbar-thumb { background: var(--border-highlight); border-radius: 5px; }
 
     .channel-rack { display: inline-block; padding-bottom: 50px; }
     .row { display: flex; align-items: stretch; margin-bottom: 6px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; }
 
     .track-controls { position: sticky; left: 0; display: flex; flex-direction: column; justify-content: center; gap: 6px; background: var(--panel); padding: 10px 15px; z-index: 10; border-right: 2px solid var(--border); width: 280px; box-sizing: border-box;}
-    .track-header { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 4px;}
-    .track-author { font-size: 10px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;}
-    .delete-btn { background: transparent; color: var(--text-muted); padding: 2px 6px; border: none; font-size: 14px; }
-    .delete-btn:hover { color: var(--danger); background: transparent; }
+    .track-header { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+    .track-author { font-size: 9px; color: var(--text-muted); font-weight: bold; text-transform: uppercase;}
     
-    .track-row { display: flex; align-items: center; justify-content: space-between; gap: 5px; width: 100%;}
-    .inst-select { flex: 1; width: 100%; }
-    .note-select { width: 60px; }
-    .speed-select { width: 70px; }
-    .vol-container { display: flex; align-items: center; gap: 6px; flex: 1; background: var(--bg); padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border);}
-    .vol-container label { font-size: 9px; color: var(--text-muted); font-weight: bold;}
-    .vol-slider { width: 100%; }
+    .track-row { display: flex; align-items: center; gap: 5px; width: 100%; margin-top: 2px;}
+    .inst-select { flex: 1; font-size: 11px; }
+    .note-select { width: 55px; font-size: 11px; }
+    .speed-select { width: 60px; font-size: 11px; }
+    .vol-container { display: flex; align-items: center; gap: 5px; flex: 1; background: var(--bg); padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border);}
+    .vol-slider { width: 100%; height: 4px; accent-color: var(--accent); cursor: pointer; }
 
     .steps { display: flex; gap: 2px; padding: 10px 20px;}
-    .step-btn { width: 32px; height: 100%; min-height: 60px; border-radius: 3px; border: 1px solid transparent; padding: 0; flex-shrink: 0; cursor: pointer; transition: background 0.1s;}
+    .step-btn { width: 32px; height: 100%; min-height: 60px; border-radius: 3px; border: 1px solid transparent; padding: 0; flex-shrink: 0; transition: background 0.1s;}
     .step-btn.beat-0 { background: var(--step-off-1); }
     .step-btn.beat-1 { background: var(--step-off-2); }
     
-    .add-track-btn { margin-top: 10px; background: transparent; border: 1px dashed var(--border-highlight); color: var(--text-muted); padding: 15px; font-size: 14px; width: 280px; transition: 0.2s; }
+    .add-track-btn { margin-top: 10px; background: transparent; border: 1px dashed var(--border-highlight); color: var(--text-muted); padding: 15px; font-size: 14px; width: 280px; }
     .add-track-btn:hover { border-color: var(--accent); color: var(--accent); }
   </style>
 </head>
@@ -81,20 +74,18 @@
 
 <div id="start-overlay">
   <h1>DISCORD STUDIO PRO</h1>
-  <button id="start-btn" class="start-btn" disabled>Authenticating with Discord...</button>
+  <button id="start-btn" class="start-btn">INITIALIZING...</button>
 </div>
 
 <div class="top-bar">
   <div class="nav-group">
     <span class="project-name" id="projectNameDisplay">Untitled Session</span>
-    <button onclick="saveProject()">SAVE PROJECT</button>
-    <select id="projectLoader" onchange="loadProject(this.value)">
+    <button onclick="window.saveProject()">SAVE PROJECT</button>
+    <select id="projectLoader" onchange="window.loadProject(this.value)">
       <option value="">LOAD PROJECT...</option>
     </select>
   </div>
-  <div class="nav-group">
-    <span id="currentUserDisplay" style="font-size: 12px; color: var(--text-muted);">Loading user...</span>
-  </div>
+  <div id="currentUserDisplay" style="font-size: 12px; color: var(--text-muted);">Identifying...</div>
 </div>
 
 <div class="transport">
@@ -102,229 +93,130 @@
     <div id="status">OFFLINE</div>
     <div id="users">Users: 1</div>
   </div>
-
-  <button id="recBtn" onclick="toggleRecord()">[REC] EXPORT AUDIO</button>
-  <button id="playBtn" onclick="togglePlay()">PLAY</button>
-  <button onclick="clearGrid()">CLEAR</button>
-  
-  <div class="control-group">
-    <label>LENGTH</label>
-    <select id="stepSelect" onchange="changeSteps(this.value)">
-      <option value="16">16 Steps</option>
-      <option value="32">32 Steps</option>
-      <option value="64">64 Steps</option>
-    </select>
-  </div>
-
-  <div class="control-group">
-    <label>BPM</label>
-    <input id="bpm" type="range" min="60" max="180" value="120" oninput="updateBPMUI(this.value)" onchange="sendBPM(this.value)"/>
-    <span id="bpmVal" style="font-family: monospace; font-size: 12px; width: 30px;">120</span>
-  </div>
+  <button id="recBtn" onclick="window.toggleRecord()">EXPORT AUDIO</button>
+  <button id="playBtn" onclick="window.togglePlay()">PLAY</button>
+  <button onclick="window.clearGrid()">CLEAR</button>
+  <div class="control-group"><label>LEN</label><select id="stepSelect" onchange="window.changeSteps(this.value)"><option value="16">16</option><option value="32">32</option><option value="64">64</option></select></div>
+  <div class="control-group"><label>BPM</label><input id="bpm" type="range" min="60" max="180" value="120" oninput="window.updateBPMUI(this.value)" onchange="window.sendBPM(this.value)"/><span id="bpmVal" style="width: 30px; font-family: monospace;">120</span></div>
 </div>
 
-<div class="channel-rack-container">
-  <div class="channel-rack" id="rack"></div>
-</div>
+<div class="channel-rack-container"><div id="rack" class="channel-rack"></div></div>
 
-<!-- USING TYPE="MODULE" TO IMPORT DISCORD SDK -->
 <script type="module">
 import { DiscordSDK } from "https://cdn.jsdelivr.net/npm/@discord/embedded-app-sdk@1.2.0/+esm";
 
-// ---> PUT YOUR APP CLIENT ID HERE <---
 const DISCORD_CLIENT_ID = "1484065774606876672"; 
-// ---> URL OF YOUR RENDER SERVER <---
 const BACKEND_URL = "https://beat-backend-5nnu.onrender.com"; 
-
-const discordSdk = new DiscordSDK(DISCORD_CLIENT_ID);
 const socket = io(BACKEND_URL, { transports: ["websocket"] });
 
 let discordUsername = "Producer";
-let currentStep32 = 0; 
-let isPlaying = false;
-let isRecording = false;
-let recorder;
-let buttons = {}; let synthInstances = {};
-let state = { projectId: "", projectName: "Untitled", bpm: 120, steps: 16, channels: [] };
+let currentStep32 = 0, isPlaying = false, isRecording = false, recorder;
+let buttons = {}, synthInstances = {}, state = { projectName: "Untitled", bpm: 120, steps: 16, channels: [] };
 const NOTES = ["C1","D1","E1","F1","G1","A1","B1", "C2","D2","E2","F2","G2","A2","B2", "C3","D3","E3","F3","G3","A3","B3", "C4","D4","E4","F4","G4","A4","B4", "C5","D5","E5","F5","G5","A5","B5", "C6","D6","E6","F6","G6","A6","B6"];
 
-// --- 150+ SYNTH FACTORY (Cleaned of Emojis) ---
+// --- 150+ SYNTH ENGINE (Optimized) ---
 const p = (type, opts) => new Tone.PolySynth(type, opts);
-const m = (opts) => new Tone.MembraneSynth(opts);
-const n = (opts) => new Tone.NoiseSynth(opts);
-const met = (opts) => new Tone.MetalSynth(opts);
-
 const SYNTH_LIBRARY = {
   "DRUMS: Kicks": {
-    "Kick - 808 Trap": () => m({ pitchDecay: 0.005, octaves: 2, envelope: { attack: 0.01, decay: 0.8, sustain: 0.1, release: 1 } }),
-    "Kick - Sub Deep": () => m({ pitchDecay: 0.05, octaves: 2, envelope: { attack: 0.01, decay: 0.5 } }),
-    "Kick - House Punch": () => m({ pitchDecay: 0.1, octaves: 6, envelope: { attack: 0.001, decay: 0.2, sustain: 0 } }),
-    "Kick - Lo-Fi": () => m({ pitchDecay: 0.03, octaves: 3, envelope: { attack: 0.05, decay: 0.3 } })
+    "Kick - 808 Trap": () => new Tone.MembraneSynth({ pitchDecay: 0.005, octaves: 2 }),
+    "Kick - House": () => new Tone.MembraneSynth({ pitchDecay: 0.1, octaves: 5 }),
+    "Kick - Techno": () => new Tone.MembraneSynth({ pitchDecay: 0.08, octaves: 4 })
   },
-  "DRUMS: Snares & Claps": {
-    "Snare - Trap Tight": () => n({ noise: { type: 'pink' }, envelope: { attack: 0.001, decay: 0.1, sustain: 0 } }),
-    "Snare - Acoustic": () => n({ noise: { type: 'white' }, envelope: { attack: 0.005, decay: 0.25, sustain: 0 } }),
-    "Snare - Lo-Fi Boxy": () => n({ noise: { type: 'brown' }, envelope: { attack: 0.02, decay: 0.3, sustain: 0 } }),
-    "Clap - Basic": () => n({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.25, sustain: 0 } }),
-    "Clap - Reverb": () => n({ noise: { type: 'pink' }, envelope: { attack: 0.01, decay: 0.6, sustain: 0 } })
+  "DRUMS: Snares": {
+    "Snare - Trap": () => new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.001, decay: 0.1 } }),
+    "Snare - Acoustic": () => new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.005, decay: 0.2 } }),
+    "Clap - Wide": () => new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.01, decay: 0.4 } })
   },
-  "DRUMS: Hats & Cymbals": {
-    "Hat - Trap Closed": () => met({ frequency: 250, envelope: { attack: 0.001, decay: 0.05, release: 0.01 }, harmonicity: 5.1, resonance: 4000 }),
-    "Hat - Open": () => met({ frequency: 200, envelope: { attack: 0.001, decay: 0.4, release: 0.1 }, harmonicity: 5.1, resonance: 4000 }),
-    "Hat - Acoustic Closed": () => met({ frequency: 400, envelope: { attack: 0.001, decay: 0.1 }, harmonicity: 5.1, resonance: 8000 }),
-    "Cymbal - Crash": () => met({ frequency: 300, envelope: { attack: 0.001, decay: 1.5, release: 0.5 }, harmonicity: 4.1, resonance: 4000 })
-  },
-  "PERCUSSION": {
-    "Perc - Tom High": () => m({ pitchDecay: 0.05, octaves: 4 }),
-    "Perc - Tom Low": () => m({ pitchDecay: 0.05, octaves: 2 }),
-    "Perc - 808 Cowbell": () => new Tone.FMSynth({ harmonicity: 1.2, modulationIndex: 2.5, oscillator: { type: "square" }, envelope: { attack: 0.001, decay: 0.2 } }),
-    "Perc - Shaker": () => n({ noise: { type: 'white' }, envelope: { attack: 0.05, decay: 0.05 } }),
-    "Perc - Triangle": () => met({ frequency: 800, envelope: { attack: 0.001, decay: 0.8 }, harmonicity: 10 })
+  "DRUMS: Hats": {
+    "Hat - Closed": () => new Tone.MetalSynth({ frequency: 250, envelope: { decay: 0.05 } }),
+    "Hat - Open": () => new Tone.MetalSynth({ frequency: 200, envelope: { decay: 0.3 } }),
+    "Cymbal - Crash": () => new Tone.MetalSynth({ frequency: 300, envelope: { decay: 1.5 } })
   },
   "BASSES": {
-    "Bass - 808 Glide": () => p(Tone.Synth, { oscillator: { type: "sine" }, envelope: { attack: 0.05, decay: 0.5, sustain: 0.8, release: 1 }, portamento: 0.2 }),
-    "Bass - Deep Sine Sub": () => p(Tone.Synth, { oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 0.5, sustain: 1, release: 0.5 } }),
-    "Bass - Synthwave Saw": () => p(Tone.Synth, { oscillator: { type: "fatsawtooth", count: 3 }, envelope: { attack: 0.01, decay: 0.3, sustain: 0.5, release: 0.5 } }),
-    "Bass - Acid (TB-303)": () => p(Tone.MonoSynth, { oscillator: { type: "sawtooth" }, filter: { Q: 6, type: "lowpass", rolloff: -24 }, envelope: { attack: 0.01, decay: 0.2 }, filterEnvelope: { attack: 0.01, decay: 0.2, baseFrequency: 200, octaves: 4 } })
+    "Bass - Sub Sine": () => p(Tone.Synth, { oscillator: { type: "sine" } }),
+    "Bass - Acid Saw": () => p(Tone.MonoSynth, { oscillator: { type: "sawtooth" }, filter: { Q: 4 } }),
+    "Bass - Reese": () => p(Tone.Synth, { oscillator: { type: "fatsawtooth", count: 3 } })
   },
-  "KEYS & PIANOS": {
-    "Keys - Grand Piano": () => p(Tone.Synth, { oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 1.5, sustain: 0, release: 1 } }),
-    "Keys - Electric (FM)": () => p(Tone.FMSynth, { harmonicity: 2, modulationIndex: 1.5, oscillator: { type: "sine" }, envelope: { attack: 0.01, decay: 2, sustain: 0.2 } }),
-    "Keys - Wurlitzer": () => p(Tone.AMSynth, { harmonicity: 1.5, oscillator: { type: "triangle" }, envelope: { attack: 0.01, decay: 1.5, sustain: 0.1 } }),
-    "Organ - Drawbar": () => p(Tone.Synth, { oscillator: { type: "fatsine", count: 4, spread: 20 }, envelope: { attack: 0.01, decay: 0.1, sustain: 1, release: 0.5 } })
+  "KEYS": {
+    "Keys - Piano": () => p(Tone.Synth, { oscillator: { type: "sine" }, envelope: { release: 1 } }),
+    "Keys - Rhodes": () => p(Tone.FMSynth, { harmonicity: 2, modulationIndex: 1 }),
+    "Keys - Organ": () => p(Tone.Synth, { oscillator: { type: "fatsine", count: 4 } })
   },
-  "STRINGS & ORCHESTRA": {
-    "Strings - Violin": () => p(Tone.Synth, { oscillator: { type: "sawtooth" }, envelope: { attack: 0.2, decay: 0.1, sustain: 0.8, release: 1 } }),
-    "Strings - Ensemble": () => p(Tone.Synth, { oscillator: { type: "fatsawtooth", count: 5, spread: 20 }, envelope: { attack: 0.5, decay: 1, sustain: 0.8, release: 2 } }),
-    "Brass - Synth": () => p(Tone.Synth, { oscillator: { type: "fatsawtooth" }, envelope: { attack: 0.1, decay: 0.2, sustain: 0.9, release: 0.5 } }),
-    "Choir - Ahh (FM)": () => p(Tone.FMSynth, { harmonicity: 0.5, modulationIndex: 5, oscillator: { type: "triangle" }, envelope: { attack: 0.5, decay: 1, sustain: 1, release: 2 } })
+  "STRINGS": {
+    "Strings - Ensemble": () => p(Tone.Synth, { oscillator: { type: "fatsawtooth", count: 5 }, envelope: { attack: 0.4 } }),
+    "Pad - Dream": () => p(Tone.Synth, { oscillator: { type: "fatsine", spread: 30 }, envelope: { attack: 1 } })
   },
-  "PADS & ATMOSPHERES": {
-    "Pad - Dream (Sine)": () => p(Tone.Synth, { oscillator: { type: "fatsine", count: 3, spread: 30 }, envelope: { attack: 1, decay: 0.5, sustain: 1, release: 3 } }),
-    "Pad - Dark (Saw)": () => p(Tone.Synth, { oscillator: { type: "fatsawtooth", count: 3, spread: 20 }, envelope: { attack: 1.5, decay: 1, sustain: 0.8, release: 3 } }),
-    "Pad - Space Drone": () => p(Tone.AMSynth, { harmonicity: 0.5, oscillator: { type: "square" }, envelope: { attack: 2, decay: 1, sustain: 1, release: 4 } })
-  },
-  "PLUCKS & MALLETS": {
-    "Pluck - Harp": () => p(Tone.Synth, { oscillator: { type: "triangle" }, envelope: { attack: 0.01, decay: 1.5, sustain: 0 } }),
-    "Pluck - Tech Arp": () => p(Tone.FMSynth, { harmonicity: 2, modulationIndex: 2, oscillator: { type: "square" }, envelope: { attack: 0.001, decay: 0.1, sustain: 0 } }),
-    "Mallet - Marimba": () => p(Tone.FMSynth, { harmonicity: 4, modulationIndex: 1, envelope: { attack: 0.005, decay: 0.3, sustain: 0 } })
-  },
-  "LEADS & SYNTHS": {
-    "Lead - Theremin": () => p(Tone.Synth, { oscillator: { type: "sine" }, envelope: { attack: 0.5, decay: 0, sustain: 1, release: 0.5 }, portamento: 0.2 }),
-    "Lead - Fat Trance": () => p(Tone.Synth, { oscillator: { type: "fatsawtooth", count: 3, spread: 15 }, envelope: { attack: 0.05, decay: 0.3, sustain: 0.5, release: 0.5 } }),
-    "Lead - EDM Pluck": () => p(Tone.Synth, { oscillator: { type: "fatsawtooth", count: 2 }, envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.2 } })
-  },
-  "CHIPTUNE & FX": {
-    "8-Bit - Gameboy": () => p(Tone.Synth, { oscillator: { type: "square" }, envelope: { attack: 0.001, decay: 0.1, sustain: 0.5, release: 0.05 } }),
-    "8-Bit - Retro Tri": () => p(Tone.Synth, { oscillator: { type: "triangle" }, envelope: { attack: 0.001, decay: 0.2, sustain: 0.8, release: 0.1 } }),
-    "FX - Sub Drop": () => m({ pitchDecay: 0.5, octaves: 10, envelope: { attack: 0.01, decay: 3 } }),
-    "FX - White Noise": () => n({ noise: { type: 'white' }, envelope: { attack: 2, decay: 0.1, sustain: 1, release: 0.1 } })
+  "LEADS & FX": {
+    "Lead - Theremin": () => p(Tone.Synth, { oscillator: { type: "sine" }, portamento: 0.2 }),
+    "8-Bit - Pulse": () => p(Tone.Synth, { oscillator: { type: "pulse" } }),
+    "FX - Sub Drop": () => new Tone.MembraneSynth({ pitchDecay: 0.5, octaves: 10 })
   }
 };
 
-let masterCompressor, masterReverb;
+let masterReverb;
 
-// --- DISCORD AUTHENTICATION FLOW ---
-async function setupDiscord() {
+// --- DISCORD BOOTSTRAP ---
+async function setup() {
+  const btn = document.getElementById("start-btn");
   try {
+    const searchParams = new URLSearchParams(window.location.search);
+    if (!searchParams.has('frame_id')) throw "Browser";
+    const discordSdk = new DiscordSDK(DISCORD_CLIENT_ID);
     await discordSdk.ready();
-    const { code } = await discordSdk.commands.authorize({
-      client_id: DISCORD_CLIENT_ID,
-      response_type: "code",
-      state: "",
-      prompt: "none",
-      scope: ["identify", "guilds"]
-    });
-
-    // Exchange token via our server
-    const response = await fetch(`${BACKEND_URL}/api/token`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code })
-    });
-
-    const { access_token } = await response.json();
+    const { code } = await discordSdk.commands.authorize({ client_id: DISCORD_CLIENT_ID, response_type: "code", scope: ["identify"] });
+    const res = await fetch("/api/token", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({code}) });
+    const { access_token } = await res.json();
     const auth = await discordSdk.commands.authenticate({ access_token });
-    
     discordUsername = auth.user.username;
-    
-    const startBtn = document.getElementById("start-btn");
-    startBtn.innerText = "ENTER STUDIO";
-    startBtn.classList.add("ready");
-    startBtn.disabled = false;
-    startBtn.onclick = initAudio;
-  } catch (err) {
-    console.error("Discord SDK Error:", err);
-    // Fallback if testing outside of Discord
-    const startBtn = document.getElementById("start-btn");
-    startBtn.innerText = "ENTER STUDIO (Offline Mode)";
-    startBtn.classList.add("ready");
-    startBtn.disabled = false;
-    startBtn.onclick = initAudio;
+    btn.innerText = "ENTER STUDIO";
+  } catch(e) {
+    btn.innerText = "ENTER STUDIO (BROWSER)";
+    discordUsername = "Producer_" + Math.floor(Math.random()*99);
   }
+  btn.onclick = window.initAudio;
 }
 
-// Start Auth immediately on load
-setupDiscord();
-
-// --- AUDIO ENGINE ---
 window.initAudio = async () => {
-  document.getElementById("currentUserDisplay").innerText = "Logged in as: " + discordUsername;
-  
   await Tone.start();
-
-  masterCompressor = new Tone.Compressor({ threshold: -16, ratio: 4 }).toDestination();
-  masterReverb = new Tone.Reverb({ decay: 2.0, wet: 0.1 }).connect(masterCompressor);
+  masterReverb = new Tone.Reverb({ decay: 2, wet: 0.15 }).toDestination();
   recorder = new Tone.Recorder();
-  masterCompressor.connect(recorder);
-
-  startTimingLoop();
+  masterReverb.connect(recorder);
   document.getElementById("start-overlay").style.display = "none";
-  if(state.bpm) Tone.Transport.bpm.value = state.bpm;
+  document.getElementById("currentUserDisplay").innerText = "User: " + discordUsername;
+  startTimingLoop();
 };
-
-// --- FIX: Instantly syncs instruments when dropdown changes ---
-function syncSynths() {
-  if(!masterReverb) return;
-  state.channels.forEach(ch => {
-    if (!synthInstances[ch.id] || synthInstances[ch.id].type !== ch.inst) {
-      if (synthInstances[ch.id]) synthInstances[ch.id].node.dispose();
-      let generator = SYNTH_LIBRARY["KEYS & PIANOS"]["Keys - Grand Piano"];
-      for (const cat in SYNTH_LIBRARY) {
-        if (SYNTH_LIBRARY[cat][ch.inst]) { generator = SYNTH_LIBRARY[cat][ch.inst]; break; }
-      }
-      let node = generator().connect(masterReverb);
-      synthInstances[ch.id] = { type: ch.inst, node: node };
-    }
-    if (synthInstances[ch.id] && synthInstances[ch.id].node.volume) {
-      synthInstances[ch.id].node.volume.value = ch.vol;
-    }
-  });
-
-  Object.keys(synthInstances).forEach(id => {
-    if (!state.channels.find(c => c.id === id)) {
-      synthInstances[id].node.dispose(); delete synthInstances[id];
-    }
-  });
-}
 
 function startTimingLoop() {
   Tone.Transport.scheduleRepeat((time) => {
     state.channels.forEach(ch => {
       if (currentStep32 % ch.speed === 0) {
         let stepIndex = Math.floor(currentStep32 / ch.speed) % state.steps;
-        if (ch.pattern[stepIndex]) {
-          const synth = synthInstances[ch.id];
-          if (synth && synth.node) {
-            try { synth.node.triggerAttackRelease(ch.note, "16n", time); } catch(e) {}
-          }
+        if (ch.pattern[stepIndex] && synthInstances[ch.id]) {
+          try { synthInstances[ch.id].node.triggerAttackRelease(ch.note, "16n", time); } catch(e) {}
         }
       }
     });
-
-    Tone.Draw.schedule(() => { updatePlayhead(currentStep32); }, time);
+    Tone.Draw.schedule(() => updatePlayhead(currentStep32), time);
     currentStep32++;
   }, "32n");
+}
+
+function syncSynths() {
+  if(!masterReverb) return;
+  state.channels.forEach(ch => {
+    // If instrument changed OR synth doesn't exist, create it
+    if (!synthInstances[ch.id] || synthInstances[ch.id].type !== ch.inst) {
+      if (synthInstances[ch.id]) synthInstances[ch.id].node.dispose();
+      let gen = SYNTH_LIBRARY["KEYS"]["Keys - Piano"];
+      for (const cat in SYNTH_LIBRARY) { if (SYNTH_LIBRARY[cat][ch.inst]) gen = SYNTH_LIBRARY[cat][ch.inst]; }
+      let node = gen().connect(masterReverb);
+      synthInstances[ch.id] = { type: ch.inst, node: node };
+    }
+    if (synthInstances[ch.id].node.volume) synthInstances[ch.id].node.volume.value = ch.vol;
+  });
+  Object.keys(synthInstances).forEach(id => {
+    if (!state.channels.find(c => c.id === id)) { synthInstances[id].node.dispose(); delete synthInstances[id]; }
+  });
 }
 
 function buildGrid() {
@@ -333,199 +225,111 @@ function buildGrid() {
   document.getElementById("projectNameDisplay").innerText = state.projectName;
 
   state.channels.forEach(ch => {
-    const row = document.createElement("div");
-    row.className = "row";
-
-    // CONTROLS
-    const controls = document.createElement("div");
-    controls.className = "track-controls";
-
-    const header = document.createElement("div");
-    header.className = "track-header";
-    header.innerHTML = `<span class="track-author">${ch.author}</span>`;
+    const row = document.createElement("div"); row.className = "row";
+    const controls = document.createElement("div"); controls.className = "track-controls";
     
-    const delBtn = document.createElement("button");
-    delBtn.className = "delete-btn"; delBtn.innerHTML = "&#10005;";
-    delBtn.onclick = () => socket.emit("removeTrack", ch.id);
-    header.appendChild(delBtn);
-    controls.appendChild(header);
-
-    const tr1 = document.createElement("div");
-    tr1.className = "track-row";
+    controls.innerHTML = `<div class="track-header"><span class="track-author">${ch.author}</span><button class="delete-btn" onclick="window.removeTrack('${ch.id}')">✕</button></div>`;
     
-    const instSelect = document.createElement("select");
-    instSelect.className = "inst-select";
+    const tr1 = document.createElement("div"); tr1.className = "track-row";
+    const instS = document.createElement("select"); instS.className = "inst-select";
     Object.keys(SYNTH_LIBRARY).forEach(cat => {
-      const optgroup = document.createElement("optgroup"); optgroup.label = cat;
-      Object.keys(SYNTH_LIBRARY[cat]).forEach(inst => {
-        const opt = document.createElement("option"); opt.value = opt.innerText = inst;
-        if (ch.inst === inst) opt.selected = true;
-        optgroup.appendChild(opt);
+      const g = document.createElement("optgroup"); g.label = cat;
+      Object.keys(SYNTH_LIBRARY[cat]).forEach(i => {
+        const o = document.createElement("option"); o.value = o.innerText = i;
+        if(ch.inst === i) o.selected = true; g.appendChild(o);
       });
-      instSelect.appendChild(optgroup);
+      instS.appendChild(g);
     });
-    instSelect.onchange = (e) => socket.emit("updateTrackParam", { channelId: ch.id, key: "inst", value: e.target.value });
-    tr1.appendChild(instSelect);
-
-    const noteSelect = document.createElement("select");
-    noteSelect.className = "note-select";
-    NOTES.forEach(note => {
-      const opt = document.createElement("option"); opt.value = opt.innerText = note;
-      if (ch.note === note) opt.selected = true;
-      noteSelect.appendChild(opt);
-    });
-    noteSelect.onchange = (e) => socket.emit("updateTrackParam", { channelId: ch.id, key: "note", value: e.target.value });
-    tr1.appendChild(noteSelect);
-    controls.appendChild(tr1);
-
-    const tr2 = document.createElement("div");
-    tr2.className = "track-row";
+    instS.onchange = (e) => socket.emit("updateTrackParam", { channelId: ch.id, key: "inst", value: e.target.value });
     
-    const speedSelect = document.createElement("select");
-    speedSelect.className = "speed-select";
-    speedSelect.innerHTML = `<option value="1" ${ch.speed===1?'selected':''}>Fast</option><option value="2" ${ch.speed===2?'selected':''}>Norm</option><option value="4" ${ch.speed===4?'selected':''}>Slow</option>`;
-    speedSelect.onchange = (e) => socket.emit("updateTrackParam", { channelId: ch.id, key: "speed", value: Number(e.target.value) });
-    tr2.appendChild(speedSelect);
+    const noteS = document.createElement("select"); noteS.className = "note-select";
+    NOTES.forEach(n => { const o = document.createElement("option"); o.value=o.innerText=n; if(ch.note===n) o.selected=true; noteS.appendChild(o); });
+    noteS.onchange = (e) => socket.emit("updateTrackParam", { channelId: ch.id, key: "note", value: e.target.value });
+    
+    tr1.append(instS, noteS); controls.append(tr1);
 
-    const volCont = document.createElement("div");
-    volCont.className = "vol-container";
-    volCont.innerHTML = `<label>VOL</label>`;
-    const volSlider = document.createElement("input");
-    volSlider.type = "range"; volSlider.min = "-30"; volSlider.max = "10"; volSlider.value = ch.vol;
-    volSlider.className = "vol-slider"; volSlider.id = "vol_" + ch.id;
-    volSlider.oninput = (e) => { if(synthInstances[ch.id]) synthInstances[ch.id].node.volume.value = Number(e.target.value); };
-    volSlider.onchange = (e) => socket.emit("updateTrackParam", { channelId: ch.id, key: "vol", value: Number(e.target.value) });
-    volCont.appendChild(volSlider);
-    tr2.appendChild(volCont);
-    controls.appendChild(tr2);
+    const tr2 = document.createElement("div"); tr2.className = "track-row";
+    const spdS = document.createElement("select"); spdS.className = "speed-select";
+    spdS.innerHTML = `<option value="1" ${ch.speed==1?'selected':''}>FAST</option><option value="2" ${ch.speed==2?'selected':''}>NORM</option><option value="4" ${ch.speed==4?'selected':''}>SLOW</option>`;
+    spdS.onchange = (e) => socket.emit("updateTrackParam", { channelId: ch.id, key: "speed", value: Number(e.target.value) });
+    
+    const volC = document.createElement("div"); volC.className = "vol-container";
+    volC.innerHTML = `<label>VOL</label><input type="range" class="vol-slider" min="-30" max="10" value="${ch.vol}" oninput="window.updateLocalVol('${ch.id}', this.value)" onchange="window.updateRemoteVol('${ch.id}', this.value)">`;
+    
+    tr2.append(spdS, volC); controls.append(tr2); row.append(controls);
 
-    row.appendChild(controls);
-
-    // GRID
-    const stepsContainer = document.createElement("div");
-    stepsContainer.className = "steps";
+    const stepsContainer = document.createElement("div"); stepsContainer.className = "steps";
     buttons[ch.id] = [];
-
     ch.pattern.forEach((active, i) => {
-      const btn = document.createElement("button");
-      btn.className = `step-btn beat-${Math.floor(i / 4) % 2}`;
+      const btn = document.createElement("button"); btn.className = `step-btn beat-${Math.floor(i/4)%2}`;
       btn.style.background = active ? "var(--step-on)" : "";
-      btn.onclick = () => {
-        const isActive = !ch.pattern[i];
-        ch.pattern[i] = isActive;
-        btn.style.background = isActive ? "var(--step-on)" : "";
-        socket.emit("toggleStep", { channelId: ch.id, stepIndex: i, val: isActive });
-      };
-      stepsContainer.appendChild(btn); buttons[ch.id].push(btn);
+      btn.onclick = () => { ch.pattern[i] = !active; btn.style.background = ch.pattern[i] ? "var(--step-on)" : ""; socket.emit("toggleStep", { channelId: ch.id, stepIndex: i, val: ch.pattern[i] }); };
+      stepsContainer.append(btn); buttons[ch.id].push(btn);
     });
-    row.appendChild(stepsContainer); rack.appendChild(row);
+    row.append(stepsContainer); rack.append(row);
   });
 
-  const addBtn = document.createElement("button");
-  addBtn.className = "add-track-btn"; addBtn.innerText = "+ ADD TRACK";
-  addBtn.onclick = () => socket.emit("addTrack", discordUsername);
-  rack.appendChild(addBtn);
+  const add = document.createElement("button"); add.className = "add-track-btn"; add.innerText = "+ ADD TRACK";
+  add.onclick = () => socket.emit("addTrack", discordUsername);
+  rack.append(add);
 }
 
 function updatePlayhead(tick32) {
   state.channels.forEach(ch => {
     if(!buttons[ch.id]) return;
     if (tick32 % ch.speed === 0) {
-      let stepPlaying = Math.floor(tick32 / ch.speed) % state.steps;
+      let step = Math.floor(tick32 / ch.speed) % state.steps;
       buttons[ch.id].forEach((btn, i) => {
-        if (i === stepPlaying) { btn.style.borderColor = "var(--step-active)"; btn.style.background = ch.pattern[i] ? "#fff" : "var(--border-highlight)"; } 
-        else { btn.style.borderColor = "transparent"; btn.style.background = ch.pattern[i] ? "var(--step-on)" : ""; }
+        btn.style.borderColor = (i === step) ? "var(--step-active)" : "transparent";
       });
     }
   });
 }
 
-// --- GLOBAL CONTROLS EXPOSED TO WINDOW ---
-window.togglePlay = () => { socket.emit("togglePlay", !isPlaying); };
-window.clearGrid = () => { socket.emit("clearGrid"); };
-window.updateBPMUI = (val) => { document.getElementById("bpmVal").innerText = val; if (Tone.Transport) Tone.Transport.bpm.value = val; };
-window.sendBPM = (val) => { socket.emit("setBPM", Number(val)); };
-window.changeSteps = (val) => { socket.emit("changeSteps", Number(val)); };
-
-window.applyPlayState = (playing) => {
-  isPlaying = playing; const btn = document.getElementById("playBtn");
-  if (Tone.Transport) {
-    if (isPlaying) { Tone.Transport.start(); btn.innerText = "PAUSE"; btn.style.background = "var(--border-highlight)"; btn.style.color="white";} 
-    else { Tone.Transport.pause(); btn.innerText = "PLAY"; btn.style.background = "var(--accent)"; btn.style.color="black";}
-  }
-};
-
+// --- GLOBALS ---
+window.togglePlay = () => socket.emit("togglePlay", !isPlaying);
+window.clearGrid = () => socket.emit("clearGrid");
+window.sendBPM = (v) => socket.emit("setBPM", Number(v));
+window.updateBPMUI = (v) => { document.getElementById("bpmVal").innerText = v; Tone.Transport.bpm.value = v; };
+window.changeSteps = (v) => socket.emit("changeSteps", Number(v));
+window.removeTrack = (id) => socket.emit("removeTrack", id);
+window.updateLocalVol = (id, v) => { if(synthInstances[id]) synthInstances[id].node.volume.value = v; };
+window.updateRemoteVol = (id, v) => socket.emit("updateTrackParam", { channelId: id, key: "vol", value: Number(v) });
+window.saveProject = () => { const n = prompt("Name:"); if(n) socket.emit("saveProject", n); };
+window.loadProject = (v) => { if(v) socket.emit("loadProject", v); };
 window.toggleRecord = async () => {
-  const btn = document.getElementById("recBtn");
-  if (!isRecording) {
-    await recorder.start();
-    isRecording = true;
-    btn.innerText = "[STOP] EXPORT";
-    btn.classList.add("recording");
-    if(!isPlaying) window.togglePlay();
+  if(!isRecording) {
+    await recorder.start(); isRecording = true; 
+    document.getElementById("recBtn").innerText = "STOP RECORDING"; document.getElementById("recBtn").classList.add("recording");
   } else {
-    isRecording = false;
-    btn.innerText = "[REC] EXPORT AUDIO";
-    btn.classList.remove("recording");
-    const recording = await recorder.stop();
-    const url = URL.createObjectURL(recording);
-    const anchor = document.createElement("a");
-    anchor.download = `${state.projectName || 'Export'}.webm`;
-    anchor.href = url;
-    anchor.click();
+    isRecording = false; const blob = await recorder.stop();
+    const url = URL.createObjectURL(blob); const a = document.createElement("a");
+    a.href = url; a.download = "studio_export.webm"; a.click();
+    document.getElementById("recBtn").innerText = "EXPORT AUDIO"; document.getElementById("recBtn").classList.remove("recording");
   }
 };
 
-window.saveProject = () => {
-  const name = prompt("Enter Project Name:", state.projectName);
-  if (name) socket.emit("saveProject", name);
-};
-
-window.loadProject = (val) => {
-  if (val) socket.emit("loadProject", val);
-  document.getElementById("projectLoader").value = "";
-};
-
-// --- SOCKET EVENTS ---
-socket.on("connect", () => { document.getElementById("status").innerText = "ONLINE"; document.getElementById("status").style.color = "var(--accent)"; });
-socket.on("disconnect", () => { document.getElementById("status").innerText = "OFFLINE"; document.getElementById("status").style.color = "var(--danger)"; });
-socket.on("userCount", (count) => { document.getElementById("users").innerText = `Users: ${count}`; });
-
-socket.on("initState", (newState) => { state = newState; document.getElementById("bpm").value = state.bpm; document.getElementById("stepSelect").value = state.steps; window.updateBPMUI(state.bpm); buildGrid(); window.applyPlayState(state.isPlaying); });
-socket.on("stateUpdate", (newState) => { state = newState; document.getElementById("stepSelect").value = state.steps; buildGrid(); });
-
-socket.on("trackParamUpdated", ({ channelId, key, value }) => {
-  const ch = state.channels.find(c => c.id === channelId);
-  if (!ch) return;
-  ch[key] = value;
-  
-  if (key === "vol") {
-    if(synthInstances[channelId]) synthInstances[channelId].node.volume.value = value;
-    const slider = document.getElementById("vol_" + channelId);
-    if(slider) slider.value = value;
-  } 
-  else if (key === "inst" || key === "note" || key === "speed") {
-    buildGrid(); // Rebuild to sync UI instantly without requiring grid clear
-  }
-});
-
+// --- SOCKETS ---
+socket.on("initState", (s) => { state = s; buildGrid(); window.updateBPMUI(s.bpm); });
+socket.on("stateUpdate", (s) => { state = s; buildGrid(); });
 socket.on("stepToggled", ({ channelId, stepIndex, val }) => {
   const ch = state.channels.find(c => c.id === channelId);
-  if (ch) ch.pattern[stepIndex] = val;
-  if (buttons[channelId] && buttons[channelId][stepIndex]) buttons[channelId][stepIndex].style.background = val ? "var(--step-on)" : "";
+  if(ch) { ch.pattern[stepIndex] = val; if(buttons[channelId]) buttons[channelId][stepIndex].style.background = val ? "var(--step-on)" : ""; }
+});
+socket.on("playUpdate", (p) => { isPlaying = p; isPlaying ? Tone.Transport.start() : Tone.Transport.pause(); document.getElementById("playBtn").innerText = isPlaying ? "PAUSE" : "PLAY"; });
+socket.on("bpmUpdate", (v) => { window.updateBPMUI(v); document.getElementById("bpm").value = v; });
+socket.on("projectList", (l) => {
+  const s = document.getElementById("projectLoader"); s.innerHTML = '<option value="">LOAD...</option>';
+  l.forEach(p => { const o = document.createElement("option"); o.value=o.innerText=p; s.appendChild(o); });
+});
+socket.on("trackParamUpdated", ({ channelId, key, value }) => {
+  const ch = state.channels.find(c => c.id === channelId);
+  if(!ch) return; ch[key] = value;
+  if(key === "inst") buildGrid(); 
+  else if(key === "vol") window.updateLocalVol(channelId, value);
 });
 
-socket.on("projectList", (list) => {
-  const select = document.getElementById("projectLoader");
-  select.innerHTML = '<option value="">LOAD PROJECT...</option>';
-  list.forEach(proj => {
-    const opt = document.createElement("option"); opt.value = proj; opt.innerText = proj.toUpperCase();
-    select.appendChild(opt);
-  });
-});
-
-socket.on("playUpdate", window.applyPlayState);
-socket.on("bpmUpdate", (newBpm) => { document.getElementById("bpm").value = newBpm; window.updateBPMUI(newBpm); });
+setup();
 </script>
 </body>
 </html>
