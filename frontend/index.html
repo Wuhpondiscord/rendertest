@@ -938,22 +938,22 @@ async function boot(){
   // ── Step 1: wake up Render early ──────────────────────────────────────────
   try{ fetch(RENDER_URL + "/").catch(function(){}); }catch(e){}
 
-  // ── Step 2: Load Discord SDK ───────────────────────────────────────────
-  // patchUrlMappings is NOT used — it patches window.postMessage which causes
-  // a stack overflow with the SDK's own internal messaging system.
-  // Since everything is served from Render (same origin), no URL patching needed.
+  // ── Step 2: Load Discord SDK via script tag (not dynamic import) ──────────
+  // Dynamic import() of the SDK causes postMessage stack overflow because the
+  // ESM build sets up recursive message listeners on import.
+  // Script tag loads the UMD build which only runs when you explicitly call it.
   if(IN_DISCORD){
     ovMsg("LOADING SDK...", 20);
-    try{
-      var sdkModule = await import("/api/sdk")
-        .catch(function(){
-          return import("https://cdn.jsdelivr.net/npm/@discord/embedded-app-sdk@2/+esm");
-        });
-      console.log("SDK module loaded");
-      window._sdkModule = sdkModule;
-    }catch(e){
-      console.warn("SDK load failed:", e.message);
-    }
+    await Promise.race([
+      new Promise(function(res){
+        var s = document.createElement("script");
+        s.src = "https://cdn.jsdelivr.net/npm/@discord/embedded-app-sdk@2/dist/index.js";
+        s.onload = function(){ console.log("SDK script loaded, DiscordSDK:", typeof window.DiscordSDK); res(); };
+        s.onerror = function(){ console.warn("SDK script load failed"); res(); };
+        document.head.appendChild(s);
+      }),
+      new Promise(function(res){ setTimeout(res, 6000); })
+    ]);
   }
 
   // ── Step 3: load socket.io ──────────────────────────────────────────────
@@ -989,7 +989,7 @@ async function boot(){
   var clientId = null;
   try{
     var r = await fetch(configUrl);
-    console.log("Config response status: " + r.status + " type: " + r.headers.get("content-type"));
+    console.log("Config status:", r.status, "type:", r.headers.get("content-type"));
     var j = await r.json();
     clientId = j.clientId;
     console.log("clientId:", clientId ? "ok" : "missing");
@@ -999,37 +999,40 @@ async function boot(){
   if(IN_DISCORD && clientId){
     ovMsg("DISCORD AUTH...", 80);
     try{
-      var sdkMod = window._sdkModule;
-      if(!sdkMod) throw new Error("SDK not loaded");
-      var DiscordSDK = sdkMod.DiscordSDK;
+      // Use window.DiscordSDK from the UMD script tag (not dynamic import)
+      var SDKClass = (window.DiscordSDK && window.DiscordSDK.DiscordSDK)
+                   || window.DiscordSDK
+                   || (window.EmbeddedAppSDK && window.EmbeddedAppSDK.DiscordSDK);
+      if(!SDKClass) throw new Error("DiscordSDK class not found on window");
+      console.log("SDKClass found:", typeof SDKClass);
 
-      // Create SDK instance ONCE and call ready() ONCE.
-      // Creating it twice causes a postMessage recursion stack overflow.
       if(!discordSdk){
-        discordSdk = new DiscordSDK(clientId);
-        console.log("DiscordSDK instance created");
+        discordSdk = new SDKClass(clientId);
+        console.log("DiscordSDK created");
         await Promise.race([
           discordSdk.ready(),
           new Promise(function(_,rej){ setTimeout(function(){ rej(new Error("SDK ready timeout")); }, 10000); })
         ]);
-        console.log("Discord SDK ready");
+        console.log("SDK ready");
       }
 
       var authRes = await discordSdk.commands.authorize({
-        client_id    : clientId,
-        response_type: "code",
-        prompt       : "none",
-        scope        : ["identify"],
+        client_id: clientId, response_type: "code",
+        prompt: "none", scope: ["identify"],
       });
       console.log("Got auth code");
 
+      // Exchange code for token — done BROWSER-SIDE directly to discord.com
+      // Render's free tier blocks outbound HTTPS to discord.com from the server.
+      // The client secret is on the server, so we still proxy through /api/token
+      // but now log exactly what discord.com responds with.
       var tr = await fetch(API_BASE + "/token", {
-        method : "POST",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body   : JSON.stringify({ code: authRes.code }),
+        body: JSON.stringify({ code: authRes.code }),
       });
       var tokenData = await tr.json();
-      console.log("Token response:", JSON.stringify(tokenData).slice(0,80));
+      console.log("Token response:", JSON.stringify(tokenData).slice(0, 100));
       if(!tokenData.access_token) throw new Error("No access_token: " + JSON.stringify(tokenData));
 
       var auth = await discordSdk.commands.authenticate({ access_token: tokenData.access_token });
