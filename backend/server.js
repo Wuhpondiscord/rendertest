@@ -4,40 +4,42 @@ const { Server } = require("socket.io");
 const crypto = require("crypto");
 const cors = require("cors");
 
-// Using dynamic import for node-fetch to support latest versions
+// Discord Docs require node-fetch or similar for server-side token exchange
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
 const app = express();
 const server = http.createServer(app);
 
-// Fixed Port
-const PORT = 3001;
+// Use Port from environment (for Render/Heroku) or 3001 for local
+const PORT = process.env.PORT || 3001;
 
-// Middlewares
 app.use(cors({ origin: "*" }));
 app.use(express.json());
 
+/**
+ * DISCORD DOCS COMPLIANCE: Socket.io Configuration
+ * We use 'websocket' and 'polling' to ensure stability through the Discord Proxy.
+ */
 const io = new Server(server, {
   cors: {
     origin: "*",
     methods: ["GET", "POST"]
-  }
+  },
+  path: "/socket.io"
 });
 
-// --- DAW STATE MANAGEMENT ---
-let savedProjects = {};
-let state = {
-  projectId: "session_" + Date.now(),
-  projectName: "Untitled Session",
-  bpm: 120,
-  steps: 16,
-  isPlaying: false,
-  channels: [] // Will hold track objects {id, author, inst, note, vol, speed, pattern}
-};
-let userCount = 0;
+/**
+ * MULTIPLAYER INSTANCE MANAGEMENT
+ * Discord Docs: "Instance IDs are generated when a user launches an application. 
+ * Any users joining the same application will receive the same instanceId."
+ */
+let instances = {}; // Store states keyed by discordSdk.instanceId
+let savedProjects = {}; // Global library of saved beats
 
-// --- DISCORD AUTHENTICATION ---
-// This handles the secure exchange of the Discord code for an access token
+/**
+ * DISCORD AUTHENTICATION (Step 5 of Discord Docs)
+ * Securely exchange the 'code' from the frontend for an 'access_token'.
+ */
 app.post("/api/token", async (req, res) => {
   const { code } = req.body;
   if (!code) return res.status(400).send({ error: "Missing code" });
@@ -58,115 +60,133 @@ app.post("/api/token", async (req, res) => {
     res.json(data);
   } catch (err) {
     console.error("Discord Auth Error:", err);
-    res.status(500).send({ error: "Failed to exchange token with Discord" });
+    res.status(500).send({ error: "Auth exchange failed" });
   }
 });
 
-app.get("/", (req, res) => res.send("Studio Server Online - Port " + PORT));
+app.get("/", (req, res) => res.send("Discord Studio Server - Documentation Compliant"));
 
-// --- REAL-TIME COLLABORATION (SOCKETS) ---
+// Helper to create a fresh state for a new room/instance
+const createInitialState = (instanceId) => ({
+  instanceId,
+  projectName: "New Jam",
+  bpm: 120,
+  steps: 16,
+  isPlaying: false,
+  channels: []
+});
+
 io.on("connection", (socket) => {
-  userCount++;
-  io.emit("userCount", userCount);
+  /**
+   * DISCORD DOCS COMPLIANCE: Instance Identification
+   * We pass the instanceId from the frontend during the handshake.
+   */
+  const instanceId = socket.handshake.query.instanceId;
   
-  // Send current studio state to the new user
+  if (!instanceId) {
+    console.log("Connection rejected: No instanceId provided.");
+    return socket.disconnect();
+  }
+
+  socket.join(instanceId);
+
+  // Initialize instance state if it doesn't exist
+  if (!instances[instanceId]) {
+    instances[instanceId] = createInitialState(instanceId);
+  }
+
+  const state = instances[instanceId];
+
+  // Send the specific instance state to the joining user
   socket.emit("initState", state);
   socket.emit("projectList", Object.keys(savedProjects));
 
-  // Handle Note Toggles
-  socket.on("toggleStep", ({ channelId, stepIndex, val }) => {
-    const channel = state.channels.find(c => c.id === channelId);
-    if (channel) {
-      channel.pattern[stepIndex] = val;
-      // Broadcast to everyone else to sync their grid
-      socket.broadcast.emit("stepToggled", { channelId, stepIndex, val });
-    }
-  });
+  // --- Track Management ---
 
-  // Add New Track
-  socket.on("addTrack", (authorName) => {
+  socket.on("addTrack", (userData) => {
     const newTrack = {
-      id: "track_" + crypto.randomUUID(),
-      author: authorName || "Guest",
+      id: crypto.randomUUID(),
+      author: userData.username || "Unknown",
+      color: userData.color || "#00d4ff",
       inst: "Keys - Grand Piano",
       note: "C4",
-      vol: -6,
-      speed: 2, // 1:Fast, 2:Normal, 4:Slow
-      pattern: Array(state.steps).fill(false)
+      vol: -12,
+      speed: 1.0, // Per-track BPM multiplier
+      pattern: Array(state.steps).fill(false),
+      sampleUrl: null // Placeholder for custom audio
     };
     state.channels.push(newTrack);
-    io.emit("stateUpdate", state);
+    io.to(instanceId).emit("stateUpdate", state);
   });
 
-  // Remove Track
-  socket.on("removeTrack", (channelId) => {
-    state.channels = state.channels.filter(c => c.id !== channelId);
-    io.emit("stateUpdate", state);
+  socket.on("removeTrack", (trackId) => {
+    state.channels = state.channels.filter(t => t.id !== trackId);
+    io.to(instanceId).emit("stateUpdate", state);
   });
 
-  // Update Track Parameters (Instrument, Pitch, Volume, Speed)
-  // This is the specific fix to ensure instruments swap without clearing
-  socket.on("updateTrackParam", ({ channelId, key, value }) => {
-    const channel = state.channels.find(c => c.id === channelId);
-    if (channel) {
-      channel[key] = value;
-      // Sync parameters to all other users
-      socket.broadcast.emit("trackParamUpdated", { channelId, key, value });
+  // --- Real-time Sync ---
+
+  socket.on("toggleStep", ({ trackId, stepIndex, val }) => {
+    const track = state.channels.find(t => t.id === trackId);
+    if (track) {
+      track.pattern[stepIndex] = val;
+      // Broadcast to others in the same Discord Instance
+      socket.to(instanceId).emit("stepToggled", { trackId, stepIndex, val });
     }
   });
 
-  // Global Transport Controls
+  socket.on("updateTrackParam", ({ trackId, key, value }) => {
+    const track = state.channels.find(t => t.id === trackId);
+    if (track) {
+      track[key] = value;
+      // Sync parameters (Volume, Speed/BPM, Instrument)
+      socket.to(instanceId).emit("trackParamUpdated", { trackId, key, value });
+    }
+  });
+
+  // --- Transport Controls ---
+
   socket.on("setBPM", (newBpm) => {
     state.bpm = newBpm;
-    io.emit("bpmUpdate", newBpm);
+    io.to(instanceId).emit("bpmUpdate", newBpm);
   });
 
   socket.on("togglePlay", (playing) => {
     state.isPlaying = playing;
-    io.emit("playUpdate", playing);
+    io.to(instanceId).emit("playUpdate", playing);
   });
 
-  socket.on("changeSteps", (newSteps) => {
-    state.steps = newSteps;
-    state.channels.forEach(ch => {
-      const newPattern = Array(newSteps).fill(false);
-      for (let i = 0; i < Math.min(ch.pattern.length, newSteps); i++) {
-        newPattern[i] = ch.pattern[i];
-      }
-      ch.pattern = newPattern;
-    });
-    io.emit("stateUpdate", state);
-  });
+  // --- Save/Load Persistence ---
 
-  socket.on("clearGrid", () => {
-    state.channels.forEach(ch => ch.pattern.fill(false));
-    io.emit("stateUpdate", state);
-  });
-
-  // --- PERSISTENCE (SAVE/LOAD) ---
   socket.on("saveProject", (name) => {
     if (!name) return;
     state.projectName = name;
-    // Store a deep copy of the current state
+    // Store a snapshot of the current state
     savedProjects[name] = JSON.parse(JSON.stringify(state));
     io.emit("projectList", Object.keys(savedProjects));
-    io.emit("stateUpdate", state);
   });
 
   socket.on("loadProject", (name) => {
     if (savedProjects[name]) {
-      state = JSON.parse(JSON.stringify(savedProjects[name]));
-      state.isPlaying = false; // Safety: don't start playing immediately on load
-      io.emit("stateUpdate", state);
+      // Replace the room's current state with the saved project
+      instances[instanceId] = JSON.parse(JSON.stringify(savedProjects[name]));
+      instances[instanceId].instanceId = instanceId; // Keep the current Instance ID
+      instances[instanceId].isPlaying = false;
+      io.to(instanceId).emit("stateUpdate", instances[instanceId]);
     }
   });
 
   socket.on("disconnect", () => {
-    userCount--;
-    io.emit("userCount", userCount);
+    const room = io.sockets.adapter.rooms.get(instanceId);
+    if (!room || room.size === 0) {
+      // Optional: Cleanup instance from memory if everyone left
+      // delete instances[instanceId];
+    }
   });
 });
 
 server.listen(PORT, () => {
-  console.log(`\n--- Discord DAW Server ---\nURL: http://localhost:${PORT}\n--------------------------\n`);
+  console.log(`\n--- Discord Activity DAW Server ---`);
+  console.log(`Instance Manager: Active`);
+  console.log(`Port: ${PORT}\n`);
 });
