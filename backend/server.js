@@ -122,9 +122,26 @@ function findLayer(st, beatId, layerId) {
 // ════════════════════════════════════════════════════════════════
 //  HTTP ROUTES
 // ════════════════════════════════════════════════════════════════
-// Serve Discord SDK ESM build through our proxy.
-// Dynamic import() of an external URL is blocked by Discord's CSP.
-// Serving from same-origin /api/sdk bypasses that restriction.
+// Proxy external JS libraries blocked by Discord's CSP.
+// These must be served from same origin to be loadable inside the Activity iframe.
+const LIB_URLS = {
+  "tone" : "https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js",
+  "lame" : "https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js",
+};
+Object.entries(LIB_URLS).forEach(([name, url]) => {
+  app.get("/api/lib/" + name, async (req, res) => {
+    try {
+      const r = await fetch(url);
+      const text = await r.text();
+      res.setHeader("Content-Type", "application/javascript");
+      res.setHeader("Cache-Control", "public, max-age=86400"); // cache 24h
+      res.send(text);
+    } catch(err) {
+      console.error("Lib proxy error (" + name + "):", err.message);
+      res.status(502).send("// proxy failed for " + name + ": " + err.message);
+    }
+  });
+});
 app.get("/api/sdk", async (req, res) => {
   try {
     // jsdelivr's +esm endpoint converts the npm package to a browser-ready ES module
