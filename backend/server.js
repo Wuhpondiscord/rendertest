@@ -4,8 +4,8 @@
  *
  * Data model:
  *   Project
- *     └─ beats[]          (was "patterns")
- *           └─ layers[]   (was "channels/tracks")
+ *     └─ beats[]
+ *           └─ layers[]
  *                 └─ pattern[]  (step sequencer booleans)
  *
  * Required env vars:
@@ -18,20 +18,18 @@
 
 "use strict";
 
-const express = require("express");
-const http    = require("http");
+const express    = require("express");
+const http       = require("http");
 const { Server } = require("socket.io");
-const crypto  = require("crypto");
-const cors    = require("cors");
+const crypto     = require("crypto");
+const cors       = require("cors");
 
-// node-fetch v3 is ESM-only, so use dynamic import shim
 const fetch = (...args) => import("node-fetch").then(({ default: f }) => f(...args));
 
 const app    = express();
 const server = http.createServer(app);
 const PORT   = process.env.PORT || 3001;
 
-// ── middleware ───────────────────────────────────────────────────
 app.use(cors({ origin: "*" }));
 app.use(express.json());
 
@@ -42,7 +40,7 @@ const io = new Server(server, {
 // ════════════════════════════════════════════════════════════════
 //  STATE HELPERS
 // ════════════════════════════════════════════════════════════════
-function uuid() { return crypto.randomUUID(); }
+function uuid()   { return crypto.randomUUID(); }
 function clone(x) { return JSON.parse(JSON.stringify(x)); }
 
 function makeLayer(author, steps) {
@@ -67,7 +65,6 @@ function makeBeat(name, steps) {
   };
 }
 
-// ── initial state ────────────────────────────────────────────────
 const firstBeat = makeBeat("Beat 1", 16);
 
 let STATE = {
@@ -79,13 +76,9 @@ let STATE = {
   activeBeat  : firstBeat.id,
 };
 
-// Saved projects live here in memory.
-// For persistence across server restarts add a JSON file or DB.
-let SAVED = {};    // { name: cloned STATE }
-
+let SAVED = {};
 let userCount = 0;
 
-// ── accessors ────────────────────────────────────────────────────
 function getActiveBeat(st) {
   return st.beats.find(b => b.id === st.activeBeat) || st.beats[0];
 }
@@ -148,20 +141,18 @@ io.on("connection", (socket) => {
   userCount++;
   io.emit("userCount", userCount);
 
-  // Send current state + saved project list to the new client
   socket.emit("state", clone(STATE));
   socket.emit("projectList", Object.keys(SAVED));
 
-  // ── STEP TOGGLE ───────────────────────────────────────────────
+  // ── STEP TOGGLE ────────────────────────────────────────────
   socket.on("toggleStep", ({ beatId, layerId, stepIndex, val }) => {
     const layer = findLayer(STATE, beatId, layerId);
     if (!layer || stepIndex < 0 || stepIndex >= layer.pattern.length) return;
     layer.pattern[stepIndex] = !!val;
-    // Surgical broadcast — avoids full UI rebuild on other clients
     socket.broadcast.emit("stepToggled", { beatId, layerId, stepIndex, val: !!val });
   });
 
-  // ── ADD LAYER ─────────────────────────────────────────────────
+  // ── ADD LAYER ──────────────────────────────────────────────
   socket.on("addLayer", ({ beatId, author }) => {
     const beat = STATE.beats.find(b => b.id === beatId);
     if (!beat) return;
@@ -169,7 +160,7 @@ io.on("connection", (socket) => {
     io.emit("state", clone(STATE));
   });
 
-  // ── REMOVE LAYER ─────────────────────────────────────────────
+  // ── REMOVE LAYER ───────────────────────────────────────────
   socket.on("removeLayer", ({ beatId, layerId }) => {
     const beat = STATE.beats.find(b => b.id === beatId);
     if (!beat) return;
@@ -177,21 +168,20 @@ io.on("connection", (socket) => {
     io.emit("state", clone(STATE));
   });
 
-  // ── DUPLICATE LAYER ───────────────────────────────────────────
+  // ── DUPLICATE LAYER ────────────────────────────────────────
   socket.on("duplicateLayer", ({ beatId, layerId }) => {
     const beat = STATE.beats.find(b => b.id === beatId);
     if (!beat) return;
     const src = beat.layers.find(l => l.id === layerId);
     if (!src) return;
     const copy = JSON.parse(JSON.stringify(src));
-    copy.id = "layer_" + uuid();
-    copy.label = (copy.label ? copy.label + " copy" : "copy");
+    copy.id    = "layer_" + uuid();
+    copy.label = copy.label ? copy.label + " copy" : "copy";
     beat.layers.push(copy);
     io.emit("state", clone(STATE));
   });
 
-  // ── UPDATE LAYER PARAM ────────────────────────────────────────
-  // Allowed keys: inst, note, vol, bpmMult, label, fx
+  // ── UPDATE LAYER PARAM ─────────────────────────────────────
   socket.on("updateLayer", ({ beatId, layerId, key, value }) => {
     const ALLOWED = ["inst", "note", "vol", "bpmMult", "label", "fx"];
     if (!ALLOWED.includes(key)) return;
@@ -199,25 +189,24 @@ io.on("connection", (socket) => {
     const layer = findLayer(STATE, beatId, layerId);
     if (!layer) return;
 
-    // Basic sanitisation
     if (key === "vol")     value = Math.max(-60, Math.min(12, parseFloat(value) || 0));
     if (key === "bpmMult") value = Math.max(0.25, Math.min(4, parseFloat(value) || 1));
     if (key === "label")   value = String(value).slice(0, 32);
 
     layer[key] = value;
 
-    // For vol, broadcast a delta (not a full state) so volume changes are smooth
     if (key === "vol") {
-      socket.broadcast.emit("stepToggled", {}); // no-op trick; use dedicated event:
-      // actually send a targeted update:
+      // FIX: broadcast a targeted param update to all OTHER clients.
+      // The old code emitted a blank stepToggled (no-op) then layerParamUpdate
+      // but the original frontend had no listener for layerParamUpdate.
+      // Now the frontend listens for layerParamUpdate correctly.
       socket.broadcast.emit("layerParamUpdate", { beatId, layerId, key, value });
     } else {
-      // For inst/note/label/bpmMult a full state sync keeps everyone in check
       io.emit("state", clone(STATE));
     }
   });
 
-  // ── TRANSPORT ─────────────────────────────────────────────────
+  // ── TRANSPORT ──────────────────────────────────────────────
   socket.on("setBPM", (bpm) => {
     const v = Math.max(40, Math.min(220, Number(bpm) || 120));
     STATE.bpm = v;
@@ -232,7 +221,6 @@ io.on("connection", (socket) => {
   socket.on("changeSteps", (n) => {
     const steps = [16, 32, 64].includes(Number(n)) ? Number(n) : 16;
     STATE.steps = steps;
-    // Resize every layer in every beat
     STATE.beats.forEach(beat => {
       beat.layers.forEach(layer => {
         const fresh = Array(steps).fill(false);
@@ -252,7 +240,7 @@ io.on("connection", (socket) => {
     io.emit("state", clone(STATE));
   });
 
-  // ── BEATS ─────────────────────────────────────────────────────
+  // ── BEATS ──────────────────────────────────────────────────
   socket.on("addBeat", (name) => {
     const beat = makeBeat(name, STATE.steps);
     STATE.beats.push(beat);
@@ -275,13 +263,13 @@ io.on("connection", (socket) => {
   });
 
   socket.on("deleteBeat", (beatId) => {
-    if (STATE.beats.length <= 1) return; // always keep at least one
+    if (STATE.beats.length <= 1) return;
     STATE.beats = STATE.beats.filter(b => b.id !== beatId);
     if (STATE.activeBeat === beatId) STATE.activeBeat = STATE.beats[0].id;
     io.emit("state", clone(STATE));
   });
 
-  // ── PROJECTS ──────────────────────────────────────────────────
+  // ── PROJECTS ───────────────────────────────────────────────
   socket.on("saveProject", (name) => {
     if (!name || typeof name !== "string") return;
     const safe = name.trim().slice(0, 64);
@@ -302,13 +290,13 @@ io.on("connection", (socket) => {
   socket.on("loadProject", (name) => {
     if (!SAVED[name]) return;
     STATE = clone(SAVED[name]);
-    STATE.isPlaying = false;  // don't auto-play on load
+    STATE.isPlaying = false;
     io.emit("state", clone(STATE));
     io.emit("projectList", Object.keys(SAVED));
     io.emit("toast", `Loaded "${name}"`, "ok");
   });
 
-  // ── DISCONNECT ────────────────────────────────────────────────
+  // ── DISCONNECT ─────────────────────────────────────────────
   socket.on("disconnect", () => {
     userCount = Math.max(0, userCount - 1);
     io.emit("userCount", userCount);
@@ -327,7 +315,6 @@ server.listen(PORT, () => {
 ║  Mode : ${(process.env.NODE_ENV || "development").padEnd(32)} ║
 ╚══════════════════════════════════════════╝
   `);
-
   if (!process.env.CLIENT_ID && !process.env.VITE_CLIENT_ID)
     console.warn("⚠  WARNING: CLIENT_ID not set — Discord OAuth will fail.");
   if (!process.env.DISCORD_CLIENT_SECRET)
