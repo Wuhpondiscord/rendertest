@@ -3,6 +3,7 @@ const http = require("http");
 const { Server } = require("socket.io");
 const crypto = require("crypto");
 const cors = require("cors");
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
 const app = express();
 const server = http.createServer(app);
@@ -17,33 +18,7 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3001;
 
-// --- DISCORD AUTHENTICATION ROUTE ---
-app.post("/api/token", async (req, res) => {
-  const { code } = req.body;
-  try {
-    // Note: Use dynamic import for node-fetch if on older Node versions, or native fetch on Node 18+
-    const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
-    
-    const response = await fetch(`https://discord.com/api/oauth2/token`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: process.env.DISCORD_CLIENT_ID,
-        client_secret: process.env.DISCORD_CLIENT_SECRET,
-        grant_type: "authorization_code",
-        code: code,
-      }),
-    });
-    
-    const data = await response.json();
-    res.send(data);
-  } catch (err) {
-    console.error("Token Exchange Error:", err);
-    res.status(500).send({ error: "Failed to exchange token" });
-  }
-});
-
-// --- DAW STATE & SOCKETS ---
+// --- DAW STATE ---
 let savedProjects = {};
 let state = {
   projectId: "default",
@@ -54,6 +29,29 @@ let state = {
   channels: []
 };
 let userCount = 0;
+
+// --- DISCORD AUTHENTICATION ROUTE ---
+app.post("/api/token", async (req, res) => {
+  const { code } = req.body;
+  try {
+    const response = await fetch(`https://discord.com/api/oauth2/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: process.env.VITE_CLIENT_ID, // Ensure this matches your env key
+        client_secret: process.env.DISCORD_CLIENT_SECRET,
+        grant_type: "authorization_code",
+        code: code,
+      }),
+    });
+    
+    const data = await response.json();
+    res.json(data); // Using .json() is safer than .send()
+  } catch (err) {
+    console.error("Token Exchange Error:", err);
+    res.status(500).send({ error: "Failed to exchange token" });
+  }
+});
 
 app.get("/", (req, res) => res.send("Discord DAW Server Running"));
 
@@ -93,18 +91,19 @@ io.on("connection", (socket) => {
     const channel = state.channels.find(c => c.id === channelId);
     if (channel) {
       channel[key] = value;
+      // Broadcast to others so their UI updates, but don't broadcast back to sender to prevent loops
       socket.broadcast.emit("trackParamUpdated", { channelId, key, value });
     }
   });
 
   socket.on("setBPM", (newBpm) => {
     state.bpm = newBpm;
-    io.emit("bpmUpdate", state.bpm);
+    io.emit("bpmUpdate", newBpm);
   });
 
   socket.on("togglePlay", (isPlaying) => {
     state.isPlaying = isPlaying;
-    io.emit("playUpdate", state.isPlaying);
+    io.emit("playUpdate", isPlaying);
   });
 
   socket.on("changeSteps", (newSteps) => {
