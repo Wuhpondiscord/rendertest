@@ -30,15 +30,26 @@ const app    = express();
 const server = http.createServer(app);
 const PORT   = process.env.PORT || 3001;
 
-app.use(cors({
-  origin: [
-    "https://wuhpondiscord.github.io",
-    /\.discordsays\.com$/,           // all Discord Activity subdomains
-  ],
-  methods     : ["GET", "POST"],
-  credentials : true,
-}));
+app.use(cors({ origin: "*" }));
 app.use(express.json());
+
+// Serve the frontend index.html directly from Render.
+// This eliminates the GitHub Pages / Render split which caused URL mapping
+// ordering issues in the Discord developer portal. With everything on one server:
+//   URL Mapping: / → beat-backend-5nnu.onrender.com  (serves HTML + API)
+// No second mapping needed. No ordering conflict possible.
+const path = require("path");
+const fs   = require("fs");
+
+// Serve index.html at root — Render becomes the single origin for everything
+app.get("/", (req, res) => {
+  const indexPath = path.join(__dirname, "index.html");
+  if(fs.existsSync(indexPath)){
+    res.sendFile(indexPath);
+  } else {
+    res.json({ status: "ok", users: userCount, uptime: process.uptime() });
+  }
+});
 
 const io = new Server(server, {
   // NOTE: Discord URL mapping prefixes cannot contain dots.
@@ -171,22 +182,12 @@ app.post("/api/token", async (req, res) => {
   }
 });
 
-// Health check / status page
-app.get("/", (req, res) =>
-  res.json({ status: "ok", users: userCount, uptime: process.uptime() })
-);
-
 // Keep-alive: Render free tier spins down after 15min of inactivity.
-// Ping ourselves every 10 minutes to stay warm.
-// Only runs if RENDER_EXTERNAL_URL is set (Render sets this automatically).
 const SELF_URL = process.env.RENDER_EXTERNAL_URL;
 if(SELF_URL){
   setInterval(async()=>{
-    try{
-      await fetch(SELF_URL + "/");
-      console.log("Keep-alive ping sent");
-    }catch(e){ /* silent */ }
-  }, 10 * 60 * 1000); // every 10 minutes
+    try{ await fetch(SELF_URL + "/api/config"); }catch(e){}
+  }, 10 * 60 * 1000);
 }
 
 // ════════════════════════════════════════════════════════════════
