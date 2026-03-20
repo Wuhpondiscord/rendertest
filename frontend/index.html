@@ -11,30 +11,32 @@
 
   <style>
     :root {
-      --bg:       #080810;
-      --panel:    #0e0e1c;
-      --panel-lt: #13131f;
-      --hover:    #1a1a2a;
-      --text:     #e0e0ee;
-      --dim:      #383860;
-      --border:   #1c1c32;
-      --bhi:      #2a2a48;
-      --accent:   #00d4ff;
-      --ad:       rgba(0,212,255,.10);
-      --ag:       rgba(0,212,255,.30);
-      --danger:   #ff3060;
-      --rec:      #ff4040;
-      --recg:     rgba(255,64,64,.4);
-      --ok:       #00e5a0;
-      --warn:     #ffb800;
-      --s0:       #111120;
-      --s1:       #17172a;
+      /* FL Studio palette — charcoal/graphite with warm orange */
+      --bg:       #1a1a1a;
+      --panel:    #232323;
+      --panel-lt: #2a2a2a;
+      --panel-dk: #161616;
+      --hover:    #303030;
+      --text:     #e8e0d0;
+      --dim:      #686860;
+      --border:   #383830;
+      --bhi:      #484840;
+      --accent:   #e87820;   /* FL orange */
+      --ad:       rgba(232,120,32,.12);
+      --ag:       rgba(232,120,32,.35);
+      --danger:   #e83030;
+      --rec:      #e83030;
+      --recg:     rgba(232,48,48,.4);
+      --ok:       #70c840;
+      --warn:     #e8b820;
+      --s0:       #1e1e1e;   /* step off-beat */
+      --s1:       #242418;   /* step on-beat — warm tint */
       --mono:     'Space Mono', monospace;
       --sans:     'DM Sans', sans-serif;
       --ctrl-w:   300px;
-      --hdr-h:    52px;
-      --tp1-h:    48px;
-      --tp2-h:    42px;
+      --hdr-h:    48px;
+      --tp1-h:    46px;
+      --tp2-h:    38px;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -52,25 +54,25 @@
     /* ── OVERLAY ───────────────────────────────────────────────── */
     #overlay {
       position: fixed; inset: 0;
-      background: var(--bg);
+      background: #111111;
       display: flex; flex-direction: column;
       justify-content: center; align-items: center; gap: 0;
       z-index: 9999;
     }
     .ov-logo {
-      font-family: var(--mono); font-size: 22px; font-weight: 700;
-      letter-spacing: 7px; color: var(--accent);
+      font-family: var(--mono); font-size: 26px; font-weight: 700;
+      letter-spacing: 8px; color: var(--accent);
       text-shadow: 0 0 40px var(--ag);
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
     .ov-sub {
-      font-family: var(--mono); font-size: 9px; letter-spacing: 5px;
-      color: #44446a; margin-bottom: 32px;
+      font-family: var(--mono); font-size: 8px; letter-spacing: 5px;
+      color: #504840; margin-bottom: 36px;
     }
     .ov-bar {
-      width: 200px; height: 2px;
-      background: var(--border); border-radius: 1px; overflow: hidden;
-      margin-bottom: 8px;
+      width: 180px; height: 2px;
+      background: #2a2a2a; border-radius: 1px; overflow: hidden;
+      margin-bottom: 10px;
     }
     .ov-fill {
       height: 100%; width: 0;
@@ -78,15 +80,14 @@
       transition: width .35s ease;
     }
     #ov-msg {
-      font-family: var(--mono); font-size: 9px; letter-spacing: 3px;
-      color: #44446a; margin-bottom: 24px; min-height: 16px;
-      transition: opacity .2s;
+      font-family: var(--mono); font-size: 8px; letter-spacing: 3px;
+      color: #504840; margin-bottom: 28px; min-height: 14px;
     }
     #enter-btn {
       font-family: var(--mono); font-size: 10px; letter-spacing: 3px;
-      background: var(--border); color: #44446a;
-      border: 1px solid var(--bhi);
-      padding: 11px 36px; border-radius: 3px;
+      background: #2a2a2a; color: #504840;
+      border: 1px solid #383830;
+      padding: 11px 36px; border-radius: 2px;
       cursor: not-allowed; transition: all .2s; outline: none;
     }
     #enter-btn.ready {
@@ -94,9 +95,9 @@
       border-color: var(--accent); cursor: pointer;
       box-shadow: 0 0 28px var(--ag);
     }
-    #enter-btn.ready:hover { transform: scale(1.03); box-shadow: 0 0 36px var(--ag); }
+    #enter-btn.ready:hover { transform: scale(1.03); box-shadow: 0 0 40px var(--ag); }
 
-    /* ── AUDIO UNLOCK BANNER ───────────────────────────────────── */
+    /* ── AUDIO UNLOCK ──────────────────────────────────────────── */
     #audio-unlock {
       display: none;
       position: fixed; bottom: 0; left: 0; right: 0; z-index: 9998;
@@ -106,237 +107,292 @@
       animation: blink 1.4s ease-in-out infinite;
     }
 
-    /* ── HEADER ────────────────────────────────────────────────── */
+    /* ── HEADER — FL-style title bar with warm gradient ─────────── */
     .header {
       flex-shrink: 0; height: var(--hdr-h);
-      background: var(--panel);
-      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, #2e2e2e 0%, #232323 100%);
+      border-bottom: 2px solid #111;
       display: flex; align-items: center;
       justify-content: space-between;
-      padding: 0 16px; gap: 10px;
+      padding: 0 12px; gap: 8px;
     }
     .hdr-left  { display: flex; align-items: center; gap: 10px; }
-    .hdr-right { display: flex; align-items: center; gap: 8px; }
+    .hdr-right { display: flex; align-items: center; gap: 6px; }
     .app-name {
-      font-family: var(--mono); font-size: 13px; font-weight: 700;
-      letter-spacing: 4px; color: var(--accent);
-      text-shadow: 0 0 20px var(--ag);
+      font-family: var(--mono); font-size: 14px; font-weight: 700;
+      letter-spacing: 3px; color: var(--accent);
+      text-shadow: 0 0 16px var(--ag);
     }
     .proj-name {
-      font-family: var(--mono); font-size: 10px;
-      color: var(--dim); letter-spacing: 1px;
-      max-width: 160px; overflow: hidden;
+      font-family: var(--sans); font-size: 11px; font-weight: 500;
+      color: #a09880; letter-spacing: 0;
+      max-width: 180px; overflow: hidden;
       text-overflow: ellipsis; white-space: nowrap;
       border-left: 1px solid var(--border); padding-left: 10px;
     }
     .tbtn {
-      font-family: var(--mono); font-size: 8px; letter-spacing: 1.5px;
-      background: transparent; color: var(--dim);
-      border: 1px solid var(--border);
-      padding: 5px 12px; border-radius: 2px;
-      cursor: pointer; transition: all .12s; outline: none;
+      font-family: var(--sans); font-size: 10px; font-weight: 500;
+      background: #2a2a2a; color: #888878;
+      border: 1px solid #3a3a30;
+      padding: 4px 10px; border-radius: 2px;
+      cursor: pointer; transition: all .1s; outline: none;
     }
     .tbtn:hover { background: var(--hover); color: var(--text); border-color: var(--bhi); }
-    .tbtn.hi { border-color: var(--accent); color: var(--accent); }
-    .tbtn.hi:hover { background: var(--ad); }
+    .tbtn.hi { background: #3a2810; border-color: #c06010; color: #e8a040; }
+    .tbtn.hi:hover { background: #4a3018; border-color: var(--accent); }
     #proj-loader {
-      font-family: var(--mono); font-size: 8px;
-      background: var(--panel); color: var(--dim);
-      border: 1px solid var(--border);
-      padding: 5px 8px; border-radius: 2px; cursor: pointer; outline: none;
+      font-family: var(--sans); font-size: 10px;
+      background: #2a2a2a; color: #888878;
+      border: 1px solid #3a3a30;
+      padding: 4px 8px; border-radius: 2px; cursor: pointer; outline: none;
     }
     #user-disp {
       font-family: var(--mono); font-size: 9px;
-      color: var(--dim); letter-spacing: 1px;
+      color: #686858; letter-spacing: 1px;
     }
     #status {
       font-family: var(--mono); font-size: 8px; font-weight: 700;
-      letter-spacing: 2px; padding: 4px 8px;
-      border: 1px solid var(--border); border-radius: 2px;
-      color: var(--dim); background: var(--bg);
+      letter-spacing: 2px; padding: 3px 8px;
+      border: 1px solid #383830; border-radius: 2px;
+      color: #504840; background: #1a1a1a;
     }
-    #status.live { color: var(--ok); border-color: var(--ok); box-shadow: 0 0 8px rgba(0,229,160,.2); }
-    #users { font-family: var(--mono); font-size: 9px; color: var(--dim); }
+    #status.live {
+      color: var(--ok); border-color: #507030;
+      box-shadow: 0 0 6px rgba(112,200,64,.2);
+    }
+    #users { font-family: var(--mono); font-size: 9px; color: #585848; }
+    .users-badge {
+      font-family: var(--mono); font-size: 8px; letter-spacing: 1.5px;
+      color: #585848; cursor: pointer; padding: 3px 8px;
+      border: 1px solid #383830; border-radius: 2px;
+      transition: all .1s;
+    }
+    .users-badge:hover { color: var(--text); border-color: #585848; }
+    .users-badge.has-users { color: var(--ok); border-color: #507030; }
+    .users-panel {
+      position: fixed; top: var(--hdr-h); right: 10px;
+      background: #1e1e1c; border: 1px solid #3a3a30;
+      border-radius: 3px; z-index: 500;
+      min-width: 180px; box-shadow: 0 4px 20px rgba(0,0,0,.7);
+    }
+    .users-panel.hidden { display: none; }
+    .users-panel-hdr {
+      font-family: var(--mono); font-size: 7px; letter-spacing: 2px;
+      color: #585848; padding: 7px 10px 5px;
+      border-bottom: 1px solid #2a2a28;
+    }
+    .user-entry {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 10px; border-bottom: 1px solid #222220;
+      font-family: var(--sans); font-size: 11px; font-weight: 500;
+    }
+    .user-entry:last-child { border-bottom: none; }
+    .user-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .user-you { font-size: 8px; color: #585848; margin-left: auto; }
+    #user-presence {
+      display: flex; align-items: center; gap: 4px; margin-right: 4px;
+    }
+    .up-dot {
+      font-family: var(--sans); font-size: 9px; font-weight: 600;
+      padding: 2px 8px; border-radius: 2px; border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    .up-dot.me { font-weight: 800; }
 
-    /* ── TRANSPORT ROW 1: playback controls ─────────────────────── */
+    /* ── TRANSPORT ROW 1 — FL style thick bar ───────────────────── */
     .tp1 {
       flex-shrink: 0; height: var(--tp1-h);
-      background: var(--panel-lt);
-      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, #2a2a2a 0%, #222222 100%);
+      border-bottom: 2px solid #111;
       display: flex; align-items: center;
-      justify-content: center; gap: 6px;
-      padding: 0 16px; position: relative;
+      justify-content: center; gap: 4px;
+      padding: 0 12px; position: relative;
     }
-    .tp1-right { position: absolute; right: 16px; display: flex; gap: 6px; }
+    .tp1-right { position: absolute; right: 12px; display: flex; gap: 4px; }
     .tt {
-      font-family: var(--mono); font-size: 9px; letter-spacing: 1.5px;
-      background: var(--panel); color: var(--text);
-      border: 1px solid var(--border);
-      padding: 6px 14px; border-radius: 2px;
-      cursor: pointer; transition: all .12s; outline: none; white-space: nowrap;
+      font-family: var(--sans); font-size: 10px; font-weight: 600;
+      background: #2e2e2e;
+      color: #a09880;
+      border: 1px solid #3a3a30;
+      border-bottom: 2px solid #111;
+      padding: 5px 14px; border-radius: 2px;
+      cursor: pointer; transition: all .08s; outline: none; white-space: nowrap;
     }
-    .tt:hover { background: var(--hover); border-color: var(--bhi); }
+    .tt:hover { background: #383828; color: var(--text); border-color: #505040; }
+    .tt:active { border-bottom-width: 1px; transform: translateY(1px); }
     #play-btn {
-      background: var(--accent); color: #000;
-      border-color: var(--accent); font-weight: 700;
-      min-width: 90px; font-size: 10px;
-      box-shadow: 0 0 16px var(--ag);
+      background: linear-gradient(180deg, #f09030 0%, #c06010 100%);
+      color: #1a0800; font-weight: 800;
+      border: 1px solid #e87820; border-bottom: 2px solid #804010;
+      min-width: 84px; font-size: 11px; letter-spacing: 1px;
+      box-shadow: 0 2px 12px rgba(232,120,32,.4);
     }
-    #play-btn:hover { box-shadow: 0 0 26px var(--ag); }
-    #play-btn.on { background: transparent; color: var(--accent); border-color: var(--accent); box-shadow: 0 0 8px var(--ag); }
-    #rec-btn { color: var(--rec); border-color: rgba(255,64,64,.3); }
-    #rec-btn.on { background: var(--rec); color: #fff; border-color: var(--rec); box-shadow: 0 0 12px var(--recg); animation: blink 1.4s infinite; }
+    #play-btn:hover { background: linear-gradient(180deg, #f8a040 0%, #d07020 100%); }
+    #play-btn.on {
+      background: linear-gradient(180deg, #804010 0%, #602808 100%);
+      color: #f0a040; border-color: #c06010;
+      box-shadow: inset 0 1px 4px rgba(0,0,0,.5);
+    }
+    #btn-stop {
+      background: linear-gradient(180deg, #363636 0%, #282828 100%);
+      color: #e0d0c0; font-weight: 700; font-size: 14px;
+      border-bottom: 2px solid #111; padding: 4px 12px;
+    }
+    #rec-btn {
+      color: #e86060; border-color: rgba(232,80,80,.4);
+      background: linear-gradient(180deg, #2e2020 0%, #242020 100%);
+    }
+    #rec-btn.on {
+      background: linear-gradient(180deg, #e83030 0%, #b02020 100%);
+      color: #fff; border-color: var(--rec);
+      box-shadow: 0 2px 10px var(--recg);
+      animation: blink 1.4s infinite;
+    }
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.5} }
 
-    /* ── TRANSPORT ROW 2: parameter controls ────────────────────── */
+    /* ── TRANSPORT ROW 2 — parameter strip ──────────────────────── */
     .tp2 {
       flex-shrink: 0; height: var(--tp2-h);
-      background: var(--bg);
-      border-bottom: 1px solid var(--border);
-      display: flex; align-items: center;
-      gap: 0; padding: 0;
+      background: #1e1e1e;
+      border-bottom: 1px solid #111;
+      display: flex; align-items: stretch;
+      gap: 0;
     }
     .tp2-group {
       display: flex; align-items: center; gap: 8px;
-      padding: 0 16px; height: 100%;
-      border-right: 1px solid var(--border);
+      padding: 0 14px;
+      border-right: 1px solid #2a2a2a;
     }
     .tp2-group:last-child { border-right: none; }
     .tp2-lbl {
       font-family: var(--mono); font-size: 7px; letter-spacing: 2px;
-      color: var(--dim); white-space: nowrap;
+      color: #585848; white-space: nowrap; text-transform: uppercase;
     }
     .ctrl-val {
-      font-family: var(--mono); font-size: 12px; font-weight: 700;
-      color: var(--text); min-width: 32px;
+      font-family: var(--mono); font-size: 13px; font-weight: 700;
+      color: #e8c090; min-width: 32px;
     }
     .ctrl-sel {
       font-family: var(--mono); font-size: 10px;
-      background: transparent; color: var(--text);
+      background: transparent; color: #c0b090;
       border: none; outline: none; cursor: pointer;
     }
     input[type=range] {
       -webkit-appearance: none; appearance: none;
-      height: 2px; border-radius: 1px;
-      background: var(--bhi); outline: none; cursor: pointer;
+      height: 3px; border-radius: 2px;
+      background: #383830; outline: none; cursor: pointer;
     }
     input[type=range]::-webkit-slider-thumb {
       -webkit-appearance: none; appearance: none;
-      width: 12px; height: 12px; border-radius: 50%;
-      background: var(--accent); cursor: pointer;
-      box-shadow: 0 0 6px var(--ag);
+      width: 13px; height: 13px; border-radius: 50%;
+      background: radial-gradient(circle, #f0a040 0%, #c06010 100%);
+      cursor: pointer; border: 1px solid #e87820;
+      box-shadow: 0 0 5px var(--ag);
     }
     input[type=range]::-moz-range-thumb {
-      width: 12px; height: 12px; border-radius: 50%; border: none;
-      background: var(--accent); cursor: pointer;
+      width: 13px; height: 13px; border-radius: 50%; border: 1px solid #e87820;
+      background: #e87820; cursor: pointer;
     }
 
     /* ── BEATS BAR ─────────────────────────────────────────────── */
     .beats-bar {
-      flex-shrink: 0; background: var(--bg);
-      border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; gap: 5px;
-      padding: 5px 12px; overflow-x: auto; min-height: 36px;
+      flex-shrink: 0; background: #1e1e1e;
+      border-bottom: 1px solid #111;
+      display: flex; align-items: center; gap: 4px;
+      padding: 4px 10px; overflow-x: auto; min-height: 34px;
     }
     .beats-bar::-webkit-scrollbar { height: 2px; }
-    .beats-bar::-webkit-scrollbar-thumb { background: var(--bhi); border-radius: 1px; }
+    .beats-bar::-webkit-scrollbar-thumb { background: #484838; border-radius: 1px; }
     .beats-lbl {
-      font-family: var(--mono); font-size: 8px; letter-spacing: 3px;
-      color: var(--dim); white-space: nowrap; margin-right: 2px;
+      font-family: var(--mono); font-size: 7px; letter-spacing: 3px;
+      color: #484838; white-space: nowrap; margin-right: 4px;
     }
     .beat-tab {
-      font-family: var(--mono); font-size: 9px; letter-spacing: .5px;
-      background: var(--panel); color: #55557a;
-      border: 1px solid var(--border);
-      padding: 3px 11px; border-radius: 3px;
-      cursor: pointer; transition: all .12s; outline: none;
+      font-family: var(--sans); font-size: 10px; font-weight: 500;
+      background: #2a2a28; color: #706858;
+      border: 1px solid #3a3a30; border-bottom: 2px solid #111;
+      padding: 3px 12px; border-radius: 2px;
+      cursor: pointer; transition: all .1s; outline: none;
       white-space: nowrap; display: flex; align-items: center; gap: 5px;
     }
-    .beat-tab:hover { background: var(--hover); border-color: var(--bhi); }
-    .beat-tab.active { background: var(--ad); border-color: var(--accent); color: var(--accent); }
-    .bt-del { font-size: 9px; color: var(--dim); line-height: 1; background: none; border: none; cursor: pointer; }
+    .beat-tab:hover { background: #343428; color: var(--text); border-color: #505040; }
+    .beat-tab.active {
+      background: linear-gradient(180deg, #3a2810 0%, #2e2010 100%);
+      border-color: #c06010; color: #e8a040;
+      border-bottom-color: #804010;
+    }
+    .bt-del { font-size: 9px; color: #484838; line-height: 1; background: none; border: none; cursor: pointer; padding: 0 2px; }
     .bt-del:hover { color: var(--danger) !important; }
     .beat-add {
-      font-family: var(--mono); font-size: 9px;
-      background: transparent; color: var(--dim);
-      border: 1px dashed var(--bhi);
-      padding: 3px 11px; border-radius: 3px;
-      cursor: pointer; transition: all .12s; outline: none; white-space: nowrap;
+      font-family: var(--sans); font-size: 10px; font-weight: 500;
+      background: transparent; color: #484838;
+      border: 1px dashed #383830;
+      padding: 3px 12px; border-radius: 2px;
+      cursor: pointer; transition: all .1s; outline: none; white-space: nowrap;
     }
-    .beat-add:hover { border-color: var(--accent); color: var(--accent); }
+    .beat-add:hover { border-color: #c06010; color: #e8a040; }
 
     /* ── RACK ──────────────────────────────────────────────────── */
     .rack-wrap {
       flex: 1; overflow: auto;
-      background: var(--bg); padding: 8px 12px 60px;
+      background: #161616; padding: 6px 10px 60px;
     }
     .rack-wrap::-webkit-scrollbar { width: 6px; height: 6px; }
-    .rack-wrap::-webkit-scrollbar-thumb { background: var(--bhi); border-radius: 3px; }
-    #rack { display: inline-flex; flex-direction: column; gap: 3px; min-width: 100%; }
+    .rack-wrap::-webkit-scrollbar-thumb { background: #383830; border-radius: 3px; }
+    #rack { display: inline-flex; flex-direction: column; gap: 2px; min-width: 100%; }
 
     /* ── LAYER ROW ─────────────────────────────────────────────── */
-    /*
-     * FIX: All rows must be equal height.
-     * .lrow uses align-items:stretch so .lctrl and .steps grow together.
-     * .lctrl has a FIXED height so FX rows wrapping don't change it.
-     * height is set to exactly fit 4 internal rows at known sizes:
-     *   header(22) + r1(26) + r2(26) + r3(26) + gaps(4×5=20) + padding(14) = 134px
-     */
     .lrow {
       display: flex;
-      align-items: stretch;       /* ctrl and steps same height */
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 5px;
+      align-items: stretch;
+      background: #222220;
+      border: 1px solid #2e2e28;
+      border-radius: 3px;
       min-width: max-content;
-      transition: border-color .12s;
+      transition: border-color .1s;
     }
-    .lrow:hover { border-color: var(--bhi); }
+    .lrow:hover { border-color: #484838; }
 
-    /* Control panel — sticky left, fixed width AND fixed height */
     .lctrl {
       position: sticky; left: 0; z-index: 10;
-      background: var(--panel);
-      border-right: 1px solid var(--border);
-      border-radius: 5px 0 0 5px;
+      background: #222220;
+      border-right: 1px solid #2e2e28;
+      border-radius: 3px 0 0 3px;
       width: var(--ctrl-w);
-      /* Fixed height prevents FX row wrapping from altering row height */
       height: 136px;
       flex-shrink: 0;
       display: flex; flex-direction: column;
       justify-content: space-between;
-      gap: 0;
-      padding: 6px 10px;
-      overflow: hidden; /* clip anything that would expand it */
+      padding: 6px 8px;
+      overflow: hidden;
     }
 
     .lhdr { display: flex; justify-content: space-between; align-items: center; height: 22px; }
     .l-author {
-      font-family: var(--mono); font-size: 8px; font-weight: 700;
-      letter-spacing: 2px; text-transform: uppercase; flex-shrink: 0;
+      font-family: var(--sans); font-size: 10px; font-weight: 700;
+      letter-spacing: 0; text-transform: none; flex-shrink: 0;
     }
     .l-label {
-      font-family: var(--mono); font-size: 9px; letter-spacing: .5px;
+      font-family: var(--sans); font-size: 10px;
       background: transparent; border: none;
       border-bottom: 1px solid transparent;
-      outline: none; color: #55557a; cursor: text; width: 72px;
-      transition: border-color .12s;
+      outline: none; color: #686858; cursor: text; width: 80px;
+      transition: border-color .1s;
     }
-    .l-label:focus { color: var(--text); border-bottom-color: var(--accent); }
-    .l-label::placeholder { color: var(--dim); }
+    .l-label:focus { color: var(--text); border-bottom-color: #c06010; }
+    .l-label::placeholder { color: #484838; }
     .l-acts { display: flex; gap: 2px; }
     .ibtn {
       background: transparent; border: none; cursor: pointer;
-      font-family: var(--mono); font-size: 9px;
-      color: var(--dim); padding: 2px 4px; border-radius: 3px;
-      transition: all .1s; line-height: 1;
+      font-family: var(--sans); font-size: 10px; font-weight: 600;
+      color: #585848; padding: 2px 5px; border-radius: 2px;
+      transition: all .08s; line-height: 1;
     }
-    .ibtn:hover { background: var(--hover); color: var(--text); }
+    .ibtn:hover { background: #333328; color: var(--text); }
     .ibtn.muted  { color: var(--danger) !important; }
     .ibtn.soloed { color: var(--warn) !important; }
     .ibtn.del:hover { color: var(--danger); }
 
-    /* All internal rows same height */
     .lrow1, .lrow2, .lrow3 {
       display: flex; align-items: center; gap: 3px;
       height: 26px; flex-shrink: 0;
@@ -344,88 +400,86 @@
 
     .isel {
       font-family: var(--sans); font-size: 11px;
-      background: var(--bg); color: var(--text);
-      border: 1px solid var(--border); border-radius: 3px;
+      background: #1a1a18; color: var(--text);
+      border: 1px solid #333328; border-radius: 2px;
       padding: 0 5px; height: 26px; outline: none; cursor: pointer;
       flex: 1; min-width: 0;
     }
-    .isel:focus { border-color: var(--accent); }
+    .isel:focus { border-color: #c06010; }
     .msel {
       font-family: var(--mono); font-size: 9px;
-      background: var(--bg); color: var(--text);
-      border: 1px solid var(--border); border-radius: 3px;
+      background: #1a1a18; color: #c0a080;
+      border: 1px solid #333328; border-radius: 2px;
       padding: 0 4px; height: 26px; outline: none; cursor: pointer;
       flex-shrink: 0;
     }
-    .msel:focus { border-color: var(--accent); }
+    .msel:focus { border-color: #c06010; }
 
-    /* Slider rows — fixed height, NO flex-wrap */
     .sl-row {
       display: flex; align-items: center; gap: 4px;
-      background: var(--bg); border: 1px solid var(--border);
-      border-radius: 3px; padding: 0 6px;
+      background: #1a1a18; border: 1px solid #333328;
+      border-radius: 2px; padding: 0 6px;
       height: 26px; flex: 1; min-width: 0;
-      overflow: hidden; /* clip label if too narrow */
+      overflow: hidden;
     }
     .sl-lbl {
       font-family: var(--mono); font-size: 7px; letter-spacing: 1.5px;
-      color: var(--dim); white-space: nowrap; flex-shrink: 0;
+      color: #585848; white-space: nowrap; flex-shrink: 0;
     }
     .sl-row input[type=range] { flex: 1; min-width: 0; }
     .sl-num {
       font-family: var(--mono); font-size: 8px;
-      color: #55557a; min-width: 32px; text-align: right; flex-shrink: 0;
+      color: #908070; min-width: 32px; text-align: right; flex-shrink: 0;
     }
 
-    /* FX row: 4 sliders in a single non-wrapping line */
-    .lrow3 {
-      gap: 3px;
-      flex-wrap: nowrap; /* CRITICAL — no wrapping, keeps height fixed */
-    }
+    .lrow3 { gap: 3px; flex-wrap: nowrap; }
     .lrow3 .sl-row { min-width: 0; }
 
     .samp {
-      font-size: 12px; background: var(--bg);
-      border: 1px solid var(--border); border-radius: 3px;
+      font-size: 11px; background: #1a1a18;
+      border: 1px solid #333328; border-radius: 2px;
       padding: 0 7px; height: 26px; cursor: pointer;
-      transition: border-color .12s; flex-shrink: 0;
+      transition: border-color .1s; flex-shrink: 0; color: #907060;
     }
-    .samp:hover { border-color: var(--accent); }
-    .samp.loaded { border-color: var(--ok); }
+    .samp:hover { border-color: #c06010; color: #e8a040; }
+    .samp.loaded { border-color: #507030; color: var(--ok); }
 
     /* ── STEPS ─────────────────────────────────────────────────── */
     .steps {
       display: flex; align-items: center; gap: 2px;
-      padding: 0 10px;
-      /* stretch to full row height */
+      padding: 0 8px;
       align-self: stretch;
       align-content: center;
     }
     .sgap { width: 4px; flex-shrink: 0; }
     .sbtn {
-      /* FIX: explicit height so all step buttons match regardless of row content */
-      width: 26px; height: 100%;
+      width: 24px; height: 100%;
       min-height: 44px; max-height: 136px;
       flex-shrink: 0;
-      border-radius: 3px; border: 1px solid transparent;
+      border-radius: 2px; border: 1px solid transparent;
       padding: 0; cursor: pointer;
-      transition: background .07s, border-color .07s, filter .07s;
+      transition: filter .06s;
     }
-    .sbtn.d0 { background: var(--s0); }
-    .sbtn.d1 { background: var(--s1); }
+    /* FL-style: off steps are dark, on steps are coloured per channel */
+    .sbtn.d0 { background: #1e1e1c; border-color: #2a2a28; }
+    .sbtn.d1 { background: #242420; border-color: #2e2e2c; }
     .sbtn.on { border-color: transparent !important; }
-    .sbtn.hd { border-color: rgba(255,255,255,.75) !important; }
-    .sbtn:hover { filter: brightness(1.4); }
+    .sbtn.hd {
+      /* playhead — white-ish overlay flash */
+      border-color: rgba(255,255,255,.9) !important;
+      filter: brightness(1.3);
+    }
+    .sbtn:hover { filter: brightness(1.5); }
 
     .add-layer {
-      font-family: var(--mono); font-size: 9px; letter-spacing: 2px;
-      background: transparent; color: var(--dim);
-      border: 1px dashed var(--bhi);
-      padding: 9px; border-radius: 4px;
+      font-family: var(--sans); font-size: 10px; font-weight: 500;
+      background: transparent; color: #484838;
+      border: 1px dashed #383830;
+      padding: 8px; border-radius: 2px;
       cursor: pointer; width: var(--ctrl-w);
-      transition: all .12s; margin-top: 3px;
+      transition: all .1s; margin-top: 3px;
     }
-    .add-layer:hover { border-color: var(--accent); color: var(--accent); }
+    .add-layer:hover { border-color: #c06010; color: #e8a040; }
 
     /* ── TOASTS ────────────────────────────────────────────────── */
     #toasts {
@@ -434,84 +488,65 @@
       z-index: 9997; pointer-events: none;
     }
     .toast {
-      font-family: var(--mono); font-size: 9px; letter-spacing: .5px;
-      background: var(--panel-lt); border: 1px solid var(--bhi);
-      color: var(--text); padding: 8px 13px; border-radius: 3px;
-      box-shadow: 0 4px 18px rgba(0,0,0,.55);
-      animation: tin .18s ease;
+      font-family: var(--sans); font-size: 11px; font-weight: 500;
+      background: #2a2a28; border: 1px solid #484838;
+      color: var(--text); padding: 8px 14px; border-radius: 2px;
+      box-shadow: 0 4px 18px rgba(0,0,0,.6);
+      animation: tin .15s ease;
     }
-    .toast.ok  { border-color: var(--ok);     color: var(--ok); }
-    .toast.err { border-color: var(--danger);  color: var(--danger); }
-    @keyframes tin { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+    .toast.ok  { border-color: #507030; color: var(--ok); }
+    .toast.err { border-color: #803030; color: var(--danger); }
+    @keyframes tin { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:none} }
 
-    select option, select optgroup { background: #0f0f1a; }
+    select option, select optgroup { background: #222220; }
 
     /* ── DEBUG LOG PANEL ───────────────────────────────────────── */
     #log-panel {
       position: fixed; bottom: 0; left: 0; right: 0;
       height: 35vh; z-index: 10000;
-      background: rgba(4,4,8,.98);
-      border-top: 2px solid var(--accent);
+      background: rgba(18,18,16,.98);
+      border-top: 2px solid #c06010;
       display: flex; flex-direction: column;
       font-family: var(--mono); font-size: 10px;
-      cursor: pointer; /* tap anywhere to hide */
+      cursor: pointer;
     }
     #log-panel.hidden { display: none; }
     #log-toolbar {
       display: flex; align-items: center; gap: 6px;
-      padding: 4px 8px; border-bottom: 1px solid var(--border);
-      flex-shrink: 0; background: var(--panel);
+      padding: 4px 8px; border-bottom: 1px solid #2a2a28;
+      flex-shrink: 0; background: #1e1e1c;
     }
-    #log-toolbar span {
-      font-size: 8px; letter-spacing: 2px; color: var(--dim);
-    }
-    #log-copy {
+    #log-toolbar span { font-size: 8px; letter-spacing: 2px; color: #585848; }
+    #log-copy, #log-clear {
       font-family: var(--mono); font-size: 8px; letter-spacing: 1px;
-      background: transparent; color: var(--accent);
-      border: 1px solid var(--accent); padding: 2px 8px;
-      border-radius: 3px; cursor: pointer;
+      background: transparent; border: 1px solid #383830;
+      padding: 2px 8px; border-radius: 2px; cursor: pointer;
     }
-    #log-copy:hover { background: var(--ad); }
-    #log-clear {
-      font-family: var(--mono); font-size: 8px; letter-spacing: 1px;
-      background: transparent; color: var(--dim);
-      border: 1px solid var(--border); padding: 2px 8px;
-      border-radius: 3px; cursor: pointer;
-    }
-    #log-clear:hover { color: var(--danger); border-color: var(--danger); }
-    #log-close {
-      margin-left: auto;
-      font-family: var(--mono); font-size: 8px;
-      background: transparent; color: var(--dim);
-      border: none; cursor: pointer; padding: 2px 6px;
-    }
-    #log-close:hover { color: var(--text); }
+    #log-copy { color: #c06010; border-color: #583010; }
+    #log-clear { color: #585848; }
     #log-entries {
       flex: 1; overflow-y: auto; padding: 4px 8px;
-      user-select: text; -webkit-user-select: text; /* allow text selection for copy */
+      user-select: text; -webkit-user-select: text;
     }
     #log-entries::-webkit-scrollbar { width: 4px; }
-    #log-entries::-webkit-scrollbar-thumb { background: var(--bhi); border-radius: 2px; }
+    #log-entries::-webkit-scrollbar-thumb { background: #383830; border-radius: 2px; }
     .log-line {
       padding: 1px 0; line-height: 1.5;
-      border-bottom: 1px solid rgba(255,255,255,.03);
+      border-bottom: 1px solid rgba(255,255,255,.02);
       word-break: break-all; white-space: pre-wrap;
     }
-    .log-line.log  { color: #8888aa; }
-    .log-line.warn { color: var(--warn); }
-    .log-line.err  { color: var(--danger); }
-    .log-line.info { color: var(--accent); }
-
-    /* toggle button in transport bar */
+    .log-line.log  { color: #686858; }
+    .log-line.warn { color: #e8b820; }
+    .log-line.err  { color: #e83030; }
+    .log-line.info { color: #c08040; }
     #log-toggle {
       font-family: var(--mono); font-size: 8px; letter-spacing: 1px;
-      background: transparent; color: var(--dim);
-      border: 1px solid var(--border); padding: 3px 8px;
-      border-radius: 3px; cursor: pointer; transition: all .12s;
+      background: transparent; color: #585848;
+      border: 1px solid #383830; padding: 3px 8px;
+      border-radius: 2px; cursor: pointer; transition: all .1s;
     }
-    #log-toggle:hover { color: var(--text); border-color: var(--bhi); }
-    #log-toggle.has-err { color: var(--danger); border-color: var(--danger); }
-    #log-toggle.has-warn { color: var(--warn); border-color: var(--warn); }
+    #log-toggle:hover { color: var(--text); border-color: #585848; }
+
   </style>
 </head>
 <body>
@@ -532,7 +567,7 @@
 </div>
 
 <!-- AUDIO UNLOCK BANNER (shown when AudioContext suspended post-enter) -->
-<div id="audio-unlock">⚡ TAP HERE TO ACTIVATE AUDIO</div>
+<div id="audio-unlock">TAP HERE TO ACTIVATE AUDIO</div>
 
 <!-- HEADER -->
 <div class="header">
@@ -541,25 +576,35 @@
     <span class="proj-name" id="proj-name">Untitled Session</span>
   </div>
   <div class="hdr-right">
-    <select id="proj-loader">
-      <option value="">LOAD...</option>
-    </select>
+    <select id="proj-loader"><option value="">LOAD PROJECT...</option></select>
+    <button class="tbtn" id="btn-delete-proj">DEL</button>
+    <button class="tbtn" id="btn-import">IMPORT</button>
     <button class="tbtn" id="btn-rename">RENAME</button>
     <button class="tbtn hi" id="btn-save">SAVE</button>
     <div id="status">OFFLINE</div>
-    <div id="users">● 0</div>
-    <div id="user-disp">—</div>
+    <div id="users-badge" class="users-badge">
+      <span id="users">0</span>&nbsp;ONLINE
+    </div>
+    <div id="user-disp" style="font-family:var(--mono);font-size:9px;color:#686858;letter-spacing:1px">—</div>
   </div>
+</div>
+<input type="file" id="import-file" accept=".sleezy,.json" style="display:none"/>
+
+<!-- USERS PANEL (shown on click of ONLINE badge) -->
+<div id="users-panel" class="users-panel hidden">
+  <div class="users-panel-hdr">WHO'S IN THE SESSION</div>
+  <div id="users-list"></div>
 </div>
 
 <!-- TRANSPORT ROW 1: playback -->
 <div class="tp1">
-  <button id="rec-btn"  class="tt">⬤ REC</button>
-  <button id="btn-stop" class="tt">■ STOP</button>
-  <button id="play-btn" class="tt">▶ PLAY</button>
-  <button id="btn-clear" class="tt">✕ CLEAR</button>
+  <button id="rec-btn"   class="tt">REC</button>
+  <button id="btn-stop"  class="tt">STOP</button>
+  <button id="play-btn"  class="tt">PLAY</button>
+  <button id="btn-clear" class="tt">CLEAR</button>
   <div class="tp1-right">
-    <button id="btn-export" class="tt" style="color:var(--ok);border-color:rgba(0,229,160,.25)">⬇ EXPORT</button>
+    <button id="btn-export-mp3"  class="tt" style="color:var(--ok);border-color:rgba(112,200,64,.25)">EXPORT MP3</button>
+    <button id="btn-export-proj" class="tt" style="color:#c08040;border-color:rgba(192,128,64,.25)">EXPORT PROJECT</button>
     <button id="log-toggle" class="tt">LOGS</button>
   </div>
 </div>
@@ -1111,6 +1156,11 @@ async function boot(){
     }
   }
 
+  // Register our identity with the server now that we know who we are
+  if(socket && socket.connected){
+    socket.emit("register", { name: username, color: userColor(username), userId });
+  }
+
   ovMsg("READY", 100);
   const btn = document.getElementById("enter-btn");
   btn.textContent = "ENTER STUDIO";
@@ -1155,7 +1205,7 @@ async function enterStudio(){
   try{
     // Step 2 — user display
     var col = userColor(username);
-    document.getElementById("user-disp").textContent = "● " + username;
+    document.getElementById("user-disp").textContent = "" + username;
     document.getElementById("user-disp").style.color = col;
   }catch(e){ console.warn("user display err:", e.message); }
 
@@ -1301,7 +1351,7 @@ function buildBeatTabs(){
 
     if(S.beats.length > 1){
       const del = document.createElement("button");
-      del.className = "ibtn bt-del del"; del.textContent = "✕";
+      del.className = "ibtn bt-del del"; del.textContent = "X";
       del.onclick = e=>{ e.stopPropagation(); if(confirm('Delete "'+beat.name+'"?')) socket.emit("deleteBeat",beat.id); };
       tab.appendChild(del);
     }
@@ -1381,11 +1431,11 @@ function buildLayerRow(rack, beat, layer){
   soloBtn.onclick = ()=>{ soloId = (soloId===layer.id)?null:layer.id; buildRack(); };
 
   const dupBtn = document.createElement("button");
-  dupBtn.className = "ibtn"; dupBtn.title="Duplicate"; dupBtn.textContent="⧉";
+  dupBtn.className = "ibtn"; dupBtn.title="Duplicate"; dupBtn.textContent="DUPE";
   dupBtn.onclick = ()=>socket && socket.emit("duplicateLayer",{beatId:beat.id,layerId:layer.id});
 
   const delBtn = document.createElement("button");
-  delBtn.className = "ibtn del"; delBtn.title="Remove"; delBtn.textContent="✕";
+  delBtn.className = "ibtn del"; delBtn.title="Remove"; delBtn.textContent="X";
   delBtn.onclick = ()=>socket && socket.emit("removeLayer",{beatId:beat.id,layerId:layer.id});
 
   acts.append(muteBtn, soloBtn, dupBtn, delBtn);
@@ -1408,7 +1458,7 @@ function buildLayerRow(rack, beat, layer){
   {
     const grp = document.createElement("optgroup"); grp.label = "CUSTOM SAMPLE";
     const o   = document.createElement("option");   o.value = "__CUSTOM__";
-    o.textContent = customMap[layer.id] ? "▶ "+customMap[layer.id].name : "Upload sample...";
+    o.textContent = customMap[layer.id] ? ""+customMap[layer.id].name : "Upload sample...";
     if(layer.inst === "__CUSTOM__") o.selected = true;
     grp.appendChild(o); instSel.appendChild(grp);
   }
@@ -1454,7 +1504,7 @@ function buildLayerRow(rack, beat, layer){
 
   const sampBtn = document.createElement("button");
   sampBtn.className = "samp"+(customMap[layer.id]?" loaded":"");
-  sampBtn.title="Upload sample"; sampBtn.textContent="📁";
+  sampBtn.title="Upload sample"; sampBtn.textContent="LOAD";
   sampBtn.onclick = ()=>fileInp.click();
 
   r1.append(instSel, noteSel, sampBtn, fileInp);
@@ -1574,6 +1624,8 @@ function setupSocket(){
     console.log("Socket connected. id:", socket.id, "transport:", transport);
     document.getElementById("status").textContent = "LIVE";
     document.getElementById("status").classList.add("live");
+    // Register identity whenever we (re)connect
+    socket.emit("register", { name: username, color: userColor(username), userId });
   });
 
   socket.on("disconnect", function(reason){
@@ -1637,7 +1689,7 @@ function setupSocket(){
     const btn = document.getElementById("play-btn");
     if(p){
       tick32 = serverTick;
-      btn.textContent = "⏸ PAUSE"; btn.classList.add("on");
+      btn.textContent = "PAUSE"; btn.classList.add("on");
       if(audioReady){
         try{ Tone.Transport.start(); }catch(_){}
         if(Tone.context.state === "suspended") doUnlockAudio();
@@ -1645,7 +1697,7 @@ function setupSocket(){
     } else {
       tick32 = 0;
       if(audioReady){ try{ Tone.Transport.stop(); }catch(_){} }
-      btn.textContent = "▶ PLAY"; btn.classList.remove("on");
+      btn.textContent = "PLAY"; btn.classList.remove("on");
       // Clear playhead
       Object.values(layerBtns).forEach(function(btns){ btns.forEach(function(b){ b.classList.remove("hd"); }); });
     }
@@ -1664,16 +1716,59 @@ function setupSocket(){
     document.getElementById("bpm-val").textContent = v;
   });
 
-  socket.on("projectList", list=>{
+  socket.on("projectList", function(list){
     const sel = document.getElementById("proj-loader");
+    const cur = sel.value;
     sel.innerHTML = '<option value="">LOAD PROJECT...</option>';
-    list.forEach(name=>{
-      const o = document.createElement("option"); o.value = o.textContent = name; sel.appendChild(o);
+    // list is now array of {name, bpm, beats, savedAt, savedBy}
+    (Array.isArray(list) ? list : list.map(n=>({name:n}))).forEach(function(proj){
+      const o = document.createElement("option");
+      const name = proj.name || proj;
+      o.value = name;
+      const meta = proj.bpm ? ` (${proj.bpm}bpm, ${proj.beats}b)` : "";
+      o.textContent = name + meta;
+      sel.appendChild(o);
+    });
+    if(cur) sel.value = cur;
+  });
+
+  socket.on("userCount", function(c){
+    var el = document.getElementById("users");
+    if(el) el.textContent = c;
+    var badge = document.getElementById("users-badge");
+    if(badge){ badge.className = "users-badge" + (c > 1 ? " has-users" : ""); }
+  });
+
+  socket.on("userList", function(list){
+    var el = document.getElementById("users");
+    if(el) el.textContent = list.length;
+    var badge = document.getElementById("users-badge");
+    if(badge) badge.className = "users-badge" + (list.length > 1 ? " has-users" : "");
+    var panel = document.getElementById("users-list");
+    if(!panel) return;
+    panel.innerHTML = "";
+    list.forEach(function(u){
+      var row = document.createElement("div");
+      row.className = "user-entry";
+      var dot = document.createElement("div");
+      dot.className = "user-dot";
+      dot.style.background = u.color || "#e87820";
+      var name = document.createElement("span");
+      name.textContent = u.name || "Guest";
+      name.style.color = u.color || "#e0d0c0";
+      row.appendChild(dot);
+      row.appendChild(name);
+      if(u.name === username){
+        var you = document.createElement("span");
+        you.className = "user-you";
+        you.textContent = "YOU";
+        row.appendChild(you);
+      }
+      panel.appendChild(row);
     });
   });
 
-  socket.on("userCount", c=>{ document.getElementById("users").textContent = "● "+c; });
-  socket.on("toast", (msg,type)=>toast(msg, type||""));
+  socket.on("toast", function(msg, type){ toast(msg, type||""); });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1696,18 +1791,90 @@ W.setReverb  = v=>{
 };
 
 // ═══════════════════════════════════════════════════════════════
-//  PROJECT
+//  PROJECT SAVE / LOAD / EXPORT / IMPORT
 // ═══════════════════════════════════════════════════════════════
-W.saveProject  = ()=>{ const n=prompt("Save as:",S.projectName); if(n&&n.trim()&&socket) socket.emit("saveProject",n.trim()); };
-W.renameProject= ()=>{ const n=prompt("Rename:",S.projectName); if(n&&n.trim()&&socket) socket.emit("renameProject",n.trim()); };
-W.loadProject  = name=>{
-  if(!name||!socket) return;
-  for(const id of Object.keys(synthMap)){ try{synthMap[id].node.dispose();}catch(_){} }
-  Object.values(fxMap).forEach(f=>{ for(const n of Object.values(f)){ try{n.dispose();}catch(_){} } });
-  synthMap={}; fxMap={}; customMap={}; mutedSet=new Set(); soloId=null;
-  socket.emit("loadProject", name);
+W.saveProject = ()=>{
+  const n = prompt("Save as:", S.projectName);
+  if(!n || !n.trim() || !socket) return;
+  socket.emit("saveProject", n.trim());
+  // Also persist to localStorage so projects survive server restarts
+  try{
+    const key = "sleezy_project_" + n.trim();
+    localStorage.setItem(key, JSON.stringify({ ...S, savedAt: Date.now() }));
+    const index = JSON.parse(localStorage.getItem("sleezy_index") || "[]");
+    if(!index.includes(n.trim())){ index.push(n.trim()); localStorage.setItem("sleezy_index", JSON.stringify(index)); }
+  }catch(e){}
+};
+
+W.renameProject = ()=>{
+  const n = prompt("Rename:", S.projectName);
+  if(n && n.trim() && socket) socket.emit("renameProject", n.trim());
+};
+
+W.loadProject = name=>{
+  if(!name) return;
+  // Try socket first, fall back to localStorage
+  if(socket){
+    for(const id of Object.keys(synthMap)){ try{synthMap[id].node.dispose();}catch(_){} }
+    Object.values(fxMap).forEach(f=>{ for(const n of Object.values(f)){ try{n.dispose();}catch(_){} } });
+    synthMap={}; fxMap={}; customMap={}; mutedSet=new Set(); soloId=null;
+    socket.emit("loadProject", name);
+  }
   document.getElementById("proj-loader").value = "";
 };
+
+// Export the current session state as a .sleezy project file
+W.exportProjectFile = ()=>{
+  const data = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    exportedBy: username,
+    ...S,
+  };
+  const json = JSON.stringify(data, null, 2);
+  dlBlob(new Blob([json], {type:"application/json"}), (S.projectName||"session")+".sleezy");
+  toast("Project file downloaded","ok");
+};
+
+// Import a .sleezy project file
+W.importProjectFile = ()=>{
+  const inp = document.createElement("input");
+  inp.type = "file"; inp.accept = ".sleezy,.json";
+  inp.onchange = async()=>{
+    const file = inp.files[0]; if(!file) return;
+    try{
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if(!data.beats || !data.bpm){ toast("Invalid project file","err"); return; }
+      // Clean up existing audio nodes
+      for(const id of Object.keys(synthMap)){ try{synthMap[id].node.dispose();}catch(_){} }
+      Object.values(fxMap).forEach(f=>{ for(const n of Object.values(f)){ try{n.dispose();}catch(_){} } });
+      synthMap={}; fxMap={}; customMap={}; mutedSet=new Set(); soloId=null;
+      // Push to server so all users get it
+      if(socket) socket.emit("importProject", data);
+      toast("Imported: "+data.projectName,"ok");
+    }catch(e){ toast("Failed to read file: "+e.message,"err"); }
+  };
+  inp.click();
+};
+
+// Load saved projects from localStorage into the dropdown
+function loadLocalProjects(){
+  try{
+    const index = JSON.parse(localStorage.getItem("sleezy_index") || "[]");
+    const sel = document.getElementById("proj-loader");
+    // Add local projects not already in list
+    const existing = Array.from(sel.options).map(o=>o.value);
+    index.forEach(name=>{
+      if(!existing.includes(name)){
+        const o = document.createElement("option");
+        o.value = o.textContent = name + " (local)";
+        o.dataset.local = "1";
+        sel.appendChild(o);
+      }
+    });
+  }catch(e){}
+}
 
 // ═══════════════════════════════════════════════════════════════
 //  BEATS
@@ -1724,17 +1891,18 @@ W.toggleRecord = async()=>{
   if(!recorder){ toast("Start the studio first","err"); return; }
   if(!recording){
     await recorder.start(); recording = true;
-    document.getElementById("rec-btn").textContent = "⬤ STOP";
+    document.getElementById("rec-btn").textContent = "STOP";
     document.getElementById("rec-btn").classList.add("on");
     toast("Recording...");
   } else {
     recording = false;
     const blob = await recorder.stop();
-    document.getElementById("rec-btn").textContent = "⬤ RECORD";
+    document.getElementById("rec-btn").textContent = "RECORD";
     document.getElementById("rec-btn").classList.remove("on");
     await processExport(blob);
   }
 };
+
 W.exportAudio = async()=>{
   if(!recorder){ toast("Start the studio first","err"); return; }
   if(recording){ toast("Stop recording first","err"); return; }
@@ -1746,8 +1914,21 @@ W.exportAudio = async()=>{
   const blob = await recorder.stop();
   await processExport(blob);
 };
+
 async function processExport(webmBlob){
-  toast("Encoding...");
+  toast("Encoding MP3...");
+  const now  = new Date();
+  const date = now.toISOString().slice(0,10);
+  const name = (S.projectName || "session").replace(/[^a-zA-Z0-9_-]/g,"_");
+  const filename = name + "_" + S.bpm + "bpm_" + date;
+
+  // Always download the project file so user can re-import later
+  const projData = { version:1, exportedAt:now.toISOString(), exportedBy:username, ...S };
+  setTimeout(()=>{
+    dlBlob(new Blob([JSON.stringify(projData,null,2)], {type:"application/json"}), filename+".sleezy");
+    toast("Project file saved — import with IMPORT button", "ok");
+  }, 600);
+
   try{
     const ab      = await webmBlob.arrayBuffer();
     const actx    = new AudioContext();
@@ -1755,18 +1936,18 @@ async function processExport(webmBlob){
     const nch=decoded.numberOfChannels, sr=decoded.sampleRate;
     const L=decoded.getChannelData(0), R=nch>1?decoded.getChannelData(1):L;
     const f2i=f32=>{ const o=new Int16Array(f32.length); for(let i=0;i<f32.length;i++) o[i]=Math.max(-32768,Math.min(32767,f32[i]*32768)); return o; };
-    const enc=new lamejs.Mp3Encoder(nch,sr,128), block=1152, parts=[];
+    const enc=new lamejs.Mp3Encoder(nch,sr,192), block=1152, parts=[];
     for(let i=0;i<L.length;i+=block){
       const out=nch>1?enc.encodeBuffer(f2i(L.subarray(i,i+block)),f2i(R.subarray(i,i+block))):enc.encodeBuffer(f2i(L.subarray(i,i+block)));
       if(out.length) parts.push(new Int8Array(out));
     }
     const fl=enc.flush(); if(fl.length) parts.push(new Int8Array(fl));
-    dlBlob(new Blob(parts,{type:"audio/mp3"}),(S.projectName||"session")+".mp3");
-    toast("MP3 exported!","ok");
+    dlBlob(new Blob(parts,{type:"audio/mp3"}), filename+".mp3");
+    toast("MP3 saved!", "ok");
   }catch(e){
     console.warn("MP3 encode failed:",e);
-    dlBlob(webmBlob,(S.projectName||"session")+".webm");
-    toast("Saved as WebM","err");
+    dlBlob(webmBlob, filename+".webm");
+    toast("Saved as WebM (MP3 failed)", "err");
   }
 }
 function dlBlob(blob,name){
@@ -1789,19 +1970,66 @@ function bindChange(id, fn){
   if(el){ el.addEventListener("change", fn); el.addEventListener("input", fn); }
 }
 
-bindBtn("btn-save",     function(){ W.saveProject(); });
-bindBtn("btn-rename",   function(){ W.renameProject(); });
+bindBtn("btn-save",        function(){ W.saveProject(); });
+bindBtn("btn-rename",      function(){ W.renameProject(); });
+bindBtn("btn-delete-proj", function(){
+  var sel = document.getElementById("proj-loader");
+  var name = sel.value;
+  if(!name){ toast("Select a project to delete","err"); return; }
+  if(confirm("Delete project \"" + name + "\"? This cannot be undone."))
+    socket && socket.emit("deleteProject", name);
+});
+bindBtn("btn-import", function(){
+  document.getElementById("import-file").click();
+});
 bindBtn("rec-btn",      function(){ W.toggleRecord(); });
 bindBtn("play-btn",     function(){ W.togglePlay(); });
 bindBtn("btn-stop",     function(){ W.stopTransport(); });
 bindBtn("btn-clear",    function(){ W.clearGrid(); });
-bindBtn("btn-export",   function(){ W.exportAudio(); });
+bindBtn("btn-export-mp3",  function(){ W.exportAudio(); });
+bindBtn("btn-export-proj", function(){ W.exportProjectFile(); });
+bindBtn("btn-export",      function(){ W.exportAudio(); }); // legacy id
 bindBtn("log-toggle",   function(){ W.toggleLog(); });
 bindBtn("ov-log-btn",   function(){ W.toggleLog(); });
 bindBtn("btn-add-beat", function(){ W.addBeat(); });
 bindBtn("audio-unlock", function(){ doUnlockAudio(); });
 
-// Debounce helper — only fires fn after user stops for `delay` ms
+// Users panel toggle
+bindBtn("users-badge", function(){
+  var panel = document.getElementById("users-panel");
+  if(panel) panel.classList.toggle("hidden");
+});
+// Close users panel on click outside
+document.addEventListener("click", function(e){
+  var panel = document.getElementById("users-panel");
+  var badge = document.getElementById("users-badge");
+  if(panel && !panel.contains(e.target) && e.target !== badge && !badge.contains(e.target))
+    panel.classList.add("hidden");
+});
+
+// Import file handler
+var importFile = document.getElementById("import-file");
+if(importFile){
+  importFile.addEventListener("change", function(){
+    var file = this.files && this.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      try{
+        var data = JSON.parse(ev.target.result);
+        if(!data.beats || !data.bpm){ toast("Invalid project file","err"); return; }
+        for(var id in synthMap){ try{synthMap[id].node.dispose();}catch(_){} }
+        Object.values(fxMap).forEach(function(f){ Object.values(f).forEach(function(n){ try{n.dispose();}catch(_){} }); });
+        synthMap={}; fxMap={}; customMap={}; mutedSet=new Set(); soloId=null;
+        if(socket) socket.emit("importProject", data);
+      }catch(e){ toast("Failed to read file: "+e.message,"err"); }
+    };
+    reader.readAsText(file);
+    this.value = "";
+  });
+}
+
+// Debounce helper
 function debounce(fn, delay){
   var t; return function(){ var a=arguments, ctx=this; clearTimeout(t); t=setTimeout(function(){ fn.apply(ctx,a); }, delay); };
 }
@@ -1814,8 +2042,8 @@ if(bpmSl){
   var sendBPMDebounced = debounce(function(v){ W.sendBPM(v); }, 300);
   bpmSl.addEventListener("input", function(){
     var v = +this.value;
-    W.bpmUI(v);           // update display immediately
-    sendBPMDebounced(v);  // send to server 300ms after last move
+    W.bpmUI(v);
+    sendBPMDebounced(v);
   });
 }
 var revSl = document.getElementById("reverb-sl");
@@ -1835,8 +2063,8 @@ boot();
 <div id="log-panel" onclick="this.classList.add('hidden')">
   <div id="log-toolbar">
     <span>DEBUG CONSOLE — TAP TO HIDE</span>
-    <button id="log-copy"  >⧉ COPY ALL</button>
-    <button id="log-clear" >✕ CLEAR</button>
+    <button id="log-copy"  >COPY ALL</button>
+    <button id="log-clear" >CLEAR</button>
   </div>
   <div id="log-entries" onclick="event.stopPropagation()"></div>
 </div>
