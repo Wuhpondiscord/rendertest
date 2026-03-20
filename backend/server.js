@@ -24,7 +24,27 @@ const { Server } = require("socket.io");
 const crypto     = require("crypto");
 const cors       = require("cors");
 
-// Node 18+ has fetch built-in — no node-fetch package needed
+const path = require("path");
+const fs   = require("fs");
+
+const SAVE_FILE = path.join(__dirname, "projects.json");
+
+// Load saved projects from disk on startup
+function loadSavedProjects() {
+  try {
+    if (fs.existsSync(SAVE_FILE)) {
+      const data = JSON.parse(fs.readFileSync(SAVE_FILE, "utf8"));
+      console.log(`Loaded ${Object.keys(data).length} saved projects from disk`);
+      return data;
+    }
+  } catch(e) { console.warn("Could not load saved projects:", e.message); }
+  return {};
+}
+
+function persistProjects() {
+  try { fs.writeFileSync(SAVE_FILE, JSON.stringify(SAVED, null, 2)); }
+  catch(e) { console.warn("Could not persist projects:", e.message); }
+}
 
 const app    = express();
 const server = http.createServer(app);
@@ -38,9 +58,6 @@ app.use(express.json());
 // ordering issues in the Discord developer portal. With everything on one server:
 //   URL Mapping: / → beat-backend-5nnu.onrender.com  (serves HTML + API)
 // No second mapping needed. No ordering conflict possible.
-const path = require("path");
-const fs   = require("fs");
-
 // Serve index.html at root — Render becomes the single origin for everything
 app.get("/", (req, res) => {
   const indexPath = path.join(__dirname, "index.html");
@@ -107,8 +124,24 @@ let STATE = {
   activeBeat  : firstBeat.id,
 };
 
-let SAVED = {};
+let SAVED = loadSavedProjects();
 let userCount = 0;
+let USERS = {}; // socketId -> { name, color, id }
+
+function buildProjectList() {
+  return Object.entries(SAVED).map(([name, proj]) => ({
+    name,
+    bpm      : proj.bpm,
+    beats    : proj.beats ? proj.beats.length : 0,
+    savedAt  : proj.savedAt || null,
+    savedBy  : proj.savedBy || null,
+  }));
+}
+
+function broadcastUsers(){
+  io.emit("userList", Object.values(USERS));
+  io.emit("userCount", Object.values(USERS).length);
+}
 
 function getActiveBeat(st) {
   return st.beats.find(b => b.id === st.activeBeat) || st.beats[0];
@@ -154,6 +187,41 @@ app.get("/api/sdk", async (req, res) => {
     console.error("SDK proxy error:", err.message);
     res.status(502).send("// SDK proxy failed: " + err.message);
   }
+});
+
+// Download current session as a .sleezy project file
+app.get("/api/project/download", (req, res) => {
+  const safe = (STATE.projectName || "session").replace(/[^a-z0-9_\- ]/gi,"_");
+  res.setHeader("Content-Type", "application/json");
+  res.setHeader("Content-Disposition", `attachment; filename="${safe}.sleezy"`);
+  res.json({ version: 1, exportedAt: new Date().toISOString(), state: clone(STATE) });
+});
+
+// Download a named saved project as .sleezy
+app.get("/api/project/download/:name", (req, res) => {
+  const p = SAVED[req.params.name];
+  if(!p) return res.status(404).json({ error: "Not found" });
+  const safe = p.projectName.replace(/[^a-z0-9_\- ]/gi,"_");
+  res.setHeader("Content-Type", "application/json");
+  res.setHeader("Content-Disposition", `attachment; filename="${safe}.sleezy"`);
+  res.json({ version: 1, exportedAt: new Date().toISOString(), state: clone(p) });
+});
+
+// Import a .sleezy project (posted as JSON body)
+app.post("/api/project/import", (req, res) => {
+  const { state } = req.body;
+  if(!state || !state.beats) return res.status(400).json({ error: "Invalid project file" });
+  STATE = {
+    projectName : String(state.projectName || "Imported").slice(0,64),
+    bpm         : Math.max(40, Math.min(220, Number(state.bpm) || 120)),
+    steps       : [16,32,64].includes(Number(state.steps)) ? Number(state.steps) : 16,
+    isPlaying   : false,
+    beats       : state.beats,
+    activeBeat  : state.activeBeat || (state.beats[0] && state.beats[0].id),
+  };
+  io.emit("state", clone(STATE));
+  io.emit("toast", `Imported "${STATE.projectName}"`, "ok");
+  res.json({ ok: true });
 });
 
 app.get("/api/config", (req, res) => {
@@ -239,11 +307,24 @@ if(SELF_URL){
 //  SOCKET.IO
 // ════════════════════════════════════════════════════════════════
 io.on("connection", (socket) => {
-  userCount++;
-  io.emit("userCount", userCount);
+  USERS[socket.id] = { id: socket.id, name: "Guest", color: "#e87820" };
+  userCount = Object.keys(USERS).length;
 
   socket.emit("state", clone(STATE));
-  socket.emit("projectList", Object.keys(SAVED));
+  socket.emit("projectList", buildProjectList());
+  broadcastUsers();
+
+  // Register authenticated user — called after Discord auth completes
+  socket.on("register", ({ name, color, userId }) => {
+    if(!name) return;
+    USERS[socket.id] = {
+      id     : socket.id,
+      name   : String(name).slice(0, 32),
+      color  : color || "#e87820",
+      userId : userId || null,
+    };
+    broadcastUsers();
+  });
 
   // ── STEP TOGGLE ────────────────────────────────────────────
   socket.on("toggleStep", ({ beatId, layerId, stepIndex, val }) => {
@@ -401,10 +482,13 @@ io.on("connection", (socket) => {
     const safe = name.trim().slice(0, 64);
     if (!safe) return;
     STATE.projectName = safe;
+    STATE.savedAt = new Date().toISOString();
+    STATE.savedBy = (USERS[socket.id] && USERS[socket.id].name) || "Unknown";
     SAVED[safe] = clone(STATE);
-    io.emit("projectList", Object.keys(SAVED));
+    persistProjects();
+    io.emit("projectList", buildProjectList());
     io.emit("state", clone(STATE));
-    io.emit("toast", `Saved "${safe}"`, "ok");
+    io.emit("toast", `Saved "${safe}"`);
   });
 
   socket.on("renameProject", (name) => {
@@ -418,14 +502,41 @@ io.on("connection", (socket) => {
     STATE = clone(SAVED[name]);
     STATE.isPlaying = false;
     io.emit("state", clone(STATE));
-    io.emit("projectList", Object.keys(SAVED));
-    io.emit("toast", `Loaded "${name}"`, "ok");
+    io.emit("projectList", buildProjectList());
+    io.emit("toast", `Loaded "${name}"`);
+  });
+
+  socket.on("deleteProject", (name) => {
+    if (!SAVED[name]) return;
+    delete SAVED[name];
+    persistProjects();
+    io.emit("projectList", buildProjectList());
+    io.emit("toast", `Deleted "${name}"`);
+  });
+
+  socket.on("importProject", (data) => {
+    if (!data || !data.beats || !data.bpm) return;
+    const name = (data.projectName || "Imported").slice(0, 64);
+    // Sanitize imported data — only copy known fields
+    STATE.projectName = name;
+    STATE.bpm         = Math.max(40, Math.min(220, Number(data.bpm) || 120));
+    STATE.steps       = [16,32,64].includes(Number(data.steps)) ? Number(data.steps) : 16;
+    STATE.beats       = data.beats;
+    STATE.activeBeat  = data.activeBeat || (data.beats[0] && data.beats[0].id) || STATE.activeBeat;
+    STATE.isPlaying   = false;
+    // Auto-save the imported project
+    SAVED[name] = clone(STATE);
+    persistProjects();
+    io.emit("state", clone(STATE));
+    io.emit("projectList", buildProjectList());
+    io.emit("toast", `Imported "${name}"`);
   });
 
   // ── DISCONNECT ─────────────────────────────────────────────
   socket.on("disconnect", () => {
     userCount = Math.max(0, userCount - 1);
-    io.emit("userCount", userCount);
+    delete USERS[socket.id];
+    broadcastUsers();
   });
 });
 
