@@ -11,28 +11,30 @@
 
   <style>
     :root {
-      --bg:       #07070b;
-      --panel:    #0f0f1a;
-      --panel-lt: #161624;
-      --hover:    #1c1c2e;
-      --text:     #dddde8;
-      --muted:    #6868888;
-      --dim:      #35355a;
-      --border:   #1e1e36;
-      --bhi:      #2e2e50;
+      --bg:       #080810;
+      --panel:    #0e0e1c;
+      --panel-lt: #13131f;
+      --hover:    #1a1a2a;
+      --text:     #e0e0ee;
+      --dim:      #383860;
+      --border:   #1c1c32;
+      --bhi:      #2a2a48;
       --accent:   #00d4ff;
-      --ad:       rgba(0,212,255,.12);
-      --ag:       rgba(0,212,255,.35);
+      --ad:       rgba(0,212,255,.10);
+      --ag:       rgba(0,212,255,.30);
       --danger:   #ff3060;
       --rec:      #ff4040;
       --recg:     rgba(255,64,64,.4);
       --ok:       #00e5a0;
       --warn:     #ffb800;
-      --s0:       #14142a;
-      --s1:       #1a1a30;
+      --s0:       #111120;
+      --s1:       #17172a;
       --mono:     'Space Mono', monospace;
       --sans:     'DM Sans', sans-serif;
-      --ctrl-w:   318px;
+      --ctrl-w:   300px;
+      --hdr-h:    52px;
+      --tp1-h:    48px;
+      --tp2-h:    42px;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -104,88 +106,115 @@
       animation: blink 1.4s ease-in-out infinite;
     }
 
-    /* ── TOP BAR ───────────────────────────────────────────────── */
-    .topbar {
-      flex-shrink: 0; height: 43px;
+    /* ── HEADER ────────────────────────────────────────────────── */
+    .header {
+      flex-shrink: 0; height: var(--hdr-h);
       background: var(--panel);
       border-bottom: 1px solid var(--border);
       display: flex; align-items: center;
       justify-content: space-between;
-      padding: 0 14px; gap: 6px;
+      padding: 0 16px; gap: 10px;
     }
-    .tbl { display: flex; align-items: center; gap: 6px; }
+    .hdr-left  { display: flex; align-items: center; gap: 10px; }
+    .hdr-right { display: flex; align-items: center; gap: 8px; }
+    .app-name {
+      font-family: var(--mono); font-size: 13px; font-weight: 700;
+      letter-spacing: 4px; color: var(--accent);
+      text-shadow: 0 0 20px var(--ag);
+    }
     .proj-name {
-      font-family: var(--mono); font-size: 11px;
-      color: var(--accent); letter-spacing: 1px;
-      max-width: 200px; overflow: hidden;
+      font-family: var(--mono); font-size: 10px;
+      color: var(--dim); letter-spacing: 1px;
+      max-width: 160px; overflow: hidden;
       text-overflow: ellipsis; white-space: nowrap;
+      border-left: 1px solid var(--border); padding-left: 10px;
     }
     .tbtn {
-      font-family: var(--mono); font-size: 9px; letter-spacing: 1.5px;
-      background: transparent; color: #55557a;
+      font-family: var(--mono); font-size: 8px; letter-spacing: 1.5px;
+      background: transparent; color: var(--dim);
       border: 1px solid var(--border);
-      padding: 4px 10px; border-radius: 3px;
+      padding: 5px 12px; border-radius: 2px;
       cursor: pointer; transition: all .12s; outline: none;
     }
     .tbtn:hover { background: var(--hover); color: var(--text); border-color: var(--bhi); }
     .tbtn.hi { border-color: var(--accent); color: var(--accent); }
     .tbtn.hi:hover { background: var(--ad); }
     #proj-loader {
-      font-family: var(--mono); font-size: 9px;
-      background: var(--panel); color: #55557a;
+      font-family: var(--mono); font-size: 8px;
+      background: var(--panel); color: var(--dim);
       border: 1px solid var(--border);
-      padding: 4px 7px; border-radius: 3px; cursor: pointer; outline: none;
+      padding: 5px 8px; border-radius: 2px; cursor: pointer; outline: none;
     }
-    #user-disp { font-family: var(--mono); font-size: 10px; color: #55557a; letter-spacing: 1px; }
+    #user-disp {
+      font-family: var(--mono); font-size: 9px;
+      color: var(--dim); letter-spacing: 1px;
+    }
+    #status {
+      font-family: var(--mono); font-size: 8px; font-weight: 700;
+      letter-spacing: 2px; padding: 4px 8px;
+      border: 1px solid var(--border); border-radius: 2px;
+      color: var(--dim); background: var(--bg);
+    }
+    #status.live { color: var(--ok); border-color: var(--ok); box-shadow: 0 0 8px rgba(0,229,160,.2); }
+    #users { font-family: var(--mono); font-size: 9px; color: var(--dim); }
 
-    /* ── TRANSPORT ─────────────────────────────────────────────── */
-    .transport {
-      flex-shrink: 0; height: 49px;
+    /* ── TRANSPORT ROW 1: playback controls ─────────────────────── */
+    .tp1 {
+      flex-shrink: 0; height: var(--tp1-h);
       background: var(--panel-lt);
       border-bottom: 1px solid var(--border);
       display: flex; align-items: center;
-      justify-content: center; gap: 7px;
-      position: relative; padding: 0 12px;
+      justify-content: center; gap: 6px;
+      padding: 0 16px; position: relative;
     }
-    .t-left {
-      position: absolute; left: 12px;
-      display: flex; align-items: center; gap: 8px;
-    }
-    .t-right { position: absolute; right: 12px; display: flex; gap: 5px; }
-    #status {
-      font-family: var(--mono); font-size: 8px; font-weight: 700;
-      letter-spacing: 2px; padding: 3px 7px;
-      border: 1px solid var(--border); border-radius: 3px;
-      color: #44446a; background: var(--bg);
-    }
-    #status.live { color: var(--ok); border-color: var(--ok); }
-    #users { font-family: var(--mono); font-size: 9px; color: #44446a; }
+    .tp1-right { position: absolute; right: 16px; display: flex; gap: 6px; }
     .tt {
       font-family: var(--mono); font-size: 9px; letter-spacing: 1.5px;
       background: var(--panel); color: var(--text);
       border: 1px solid var(--border);
-      padding: 5px 11px; border-radius: 3px;
+      padding: 6px 14px; border-radius: 2px;
       cursor: pointer; transition: all .12s; outline: none; white-space: nowrap;
     }
     .tt:hover { background: var(--hover); border-color: var(--bhi); }
     #play-btn {
       background: var(--accent); color: #000;
-      border-color: var(--accent); font-weight: 700; min-width: 78px;
-      box-shadow: 0 0 14px var(--ag);
+      border-color: var(--accent); font-weight: 700;
+      min-width: 90px; font-size: 10px;
+      box-shadow: 0 0 16px var(--ag);
     }
-    #play-btn:hover { box-shadow: 0 0 22px var(--ag); }
-    #play-btn.on { background: var(--panel-lt); color: var(--accent); border-color: var(--accent); box-shadow: none; }
-    #rec-btn { color: var(--rec); border-color: rgba(255,64,64,.35); }
+    #play-btn:hover { box-shadow: 0 0 26px var(--ag); }
+    #play-btn.on { background: transparent; color: var(--accent); border-color: var(--accent); box-shadow: 0 0 8px var(--ag); }
+    #rec-btn { color: var(--rec); border-color: rgba(255,64,64,.3); }
     #rec-btn.on { background: var(--rec); color: #fff; border-color: var(--rec); box-shadow: 0 0 12px var(--recg); animation: blink 1.4s infinite; }
-    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.55} }
-    .ctrl {
-      display: flex; align-items: center; gap: 5px;
-      background: var(--bg); border: 1px solid var(--border);
-      padding: 3px 9px; border-radius: 3px; height: 32px;
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+    /* ── TRANSPORT ROW 2: parameter controls ────────────────────── */
+    .tp2 {
+      flex-shrink: 0; height: var(--tp2-h);
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center;
+      gap: 0; padding: 0;
     }
-    .ctrl-lbl { font-family: var(--mono); font-size: 7px; letter-spacing: 2px; color: var(--dim); }
-    .ctrl-val { font-family: var(--mono); font-size: 11px; color: var(--text); min-width: 28px; }
-    .ctrl-sel { font-family: var(--mono); font-size: 10px; background: transparent; color: var(--text); border: none; outline: none; cursor: pointer; }
+    .tp2-group {
+      display: flex; align-items: center; gap: 8px;
+      padding: 0 16px; height: 100%;
+      border-right: 1px solid var(--border);
+    }
+    .tp2-group:last-child { border-right: none; }
+    .tp2-lbl {
+      font-family: var(--mono); font-size: 7px; letter-spacing: 2px;
+      color: var(--dim); white-space: nowrap;
+    }
+    .ctrl-val {
+      font-family: var(--mono); font-size: 12px; font-weight: 700;
+      color: var(--text); min-width: 32px;
+    }
+    .ctrl-sel {
+      font-family: var(--mono); font-size: 10px;
+      background: transparent; color: var(--text);
+      border: none; outline: none; cursor: pointer;
+    }
     input[type=range] {
       -webkit-appearance: none; appearance: none;
       height: 2px; border-radius: 1px;
@@ -193,12 +222,12 @@
     }
     input[type=range]::-webkit-slider-thumb {
       -webkit-appearance: none; appearance: none;
-      width: 11px; height: 11px; border-radius: 50%;
+      width: 12px; height: 12px; border-radius: 50%;
       background: var(--accent); cursor: pointer;
-      box-shadow: 0 0 5px var(--ag);
+      box-shadow: 0 0 6px var(--ag);
     }
     input[type=range]::-moz-range-thumb {
-      width: 11px; height: 11px; border-radius: 50%; border: none;
+      width: 12px; height: 12px; border-radius: 50%; border: none;
       background: var(--accent); cursor: pointer;
     }
 
@@ -505,53 +534,55 @@
 <!-- AUDIO UNLOCK BANNER (shown when AudioContext suspended post-enter) -->
 <div id="audio-unlock">⚡ TAP HERE TO ACTIVATE AUDIO</div>
 
-<!-- TOP BAR -->
-<div class="topbar">
-  <div class="tbl">
+<!-- HEADER -->
+<div class="header">
+  <div class="hdr-left">
+    <span class="app-name">SLEEZY</span>
     <span class="proj-name" id="proj-name">Untitled Session</span>
-    <button class="tbtn hi" id="btn-save">SAVE</button>
-    <button class="tbtn"    id="btn-rename">RENAME</button>
-    <select id="proj-loader">
-      <option value="">LOAD PROJECT...</option>
-    </select>
   </div>
-  <div id="user-disp">Authenticating...</div>
-</div>
-
-<!-- TRANSPORT -->
-<div class="transport">
-  <div class="t-left">
+  <div class="hdr-right">
+    <select id="proj-loader">
+      <option value="">LOAD...</option>
+    </select>
+    <button class="tbtn" id="btn-rename">RENAME</button>
+    <button class="tbtn hi" id="btn-save">SAVE</button>
     <div id="status">OFFLINE</div>
     <div id="users">● 0</div>
+    <div id="user-disp">—</div>
   </div>
+</div>
 
-  <button id="rec-btn"  class="tt">⬤ RECORD</button>
-  <button id="play-btn" class="tt">▶ PLAY</button>
+<!-- TRANSPORT ROW 1: playback -->
+<div class="tp1">
+  <button id="rec-btn"  class="tt">⬤ REC</button>
   <button id="btn-stop" class="tt">■ STOP</button>
+  <button id="play-btn" class="tt">▶ PLAY</button>
   <button id="btn-clear" class="tt">✕ CLEAR</button>
+  <div class="tp1-right">
+    <button id="btn-export" class="tt" style="color:var(--ok);border-color:rgba(0,229,160,.25)">⬇ EXPORT</button>
+    <button id="log-toggle" class="tt">LOGS</button>
+  </div>
+</div>
 
-  <div class="ctrl">
-    <span class="ctrl-lbl">STEPS</span>
+<!-- TRANSPORT ROW 2: parameters -->
+<div class="tp2">
+  <div class="tp2-group">
+    <span class="tp2-lbl">BPM</span>
+    <input type="range" id="bpm-sl" min="40" max="220" value="120" style="width:80px"/>
+    <span class="ctrl-val" id="bpm-val">120</span>
+  </div>
+  <div class="tp2-group">
+    <span class="tp2-lbl">STEPS</span>
     <select class="ctrl-sel" id="step-sel">
       <option value="16">16</option>
       <option value="32">32</option>
       <option value="64">64</option>
     </select>
   </div>
-  <div class="ctrl">
-    <span class="ctrl-lbl">BPM</span>
-    <input type="range" id="bpm-sl" min="40" max="220" value="120" style="width:86px"/>
-    <span class="ctrl-val" id="bpm-val">120</span>
-  </div>
-  <div class="ctrl">
-    <span class="ctrl-lbl">REVERB</span>
-    <input type="range" id="reverb-sl" min="0" max="100" value="15" style="width:66px"/>
-    <span class="ctrl-val" id="reverb-val" style="font-size:9px">15%</span>
-  </div>
-
-  <div class="t-right">
-    <button id="btn-export" class="tt" style="color:var(--ok);border-color:rgba(0,229,160,.3)">⬇ EXPORT</button>
-    <button id="log-toggle">LOGS</button>
+  <div class="tp2-group">
+    <span class="tp2-lbl">REVERB</span>
+    <input type="range" id="reverb-sl" min="0" max="100" value="15" style="width:60px"/>
+    <span class="ctrl-val" id="reverb-val" style="font-size:10px">15%</span>
   </div>
 </div>
 
@@ -1182,43 +1213,53 @@ async function enterStudio(){
 // ═══════════════════════════════════════════════════════════════
 //  SEQUENCER LOOP
 // ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+//  SEQUENCER — driven by server "tick" events for tight sync
+//  Each "tick" from the server = one 32nd note.
+//  Audio is triggered immediately on tick receipt using Tone.now().
+// ═══════════════════════════════════════════════════════════════
 function startLoop(){
-  Tone.Transport.scheduleRepeat((time)=>{
-    const beat = getActiveBeat();
-    if(!beat){ tick32++; return; }
+  // No-op: sequencer is now driven by socket "tick" events in setupSocket()
+  // Tone.Transport is only used for AudioContext timing (not scheduling)
+  try{ Tone.Transport.start(); }catch(_){}
+}
 
-    beat.layers.forEach(layer=>{
-      if(mutedSet.has(layer.id)) return;
-      if(soloId && soloId !== layer.id) return;
+function fireTick(t){
+  if(!audioReady || !playing) return;
+  const beat = getActiveBeat();
+  if(!beat) return;
 
-      const mult = layer.bpmMult || 1;
-      const div  = Math.max(1, Math.round(2/mult));
-      if(tick32 % div !== 0) return;
+  const now = Tone.now();
+  beat.layers.forEach(function(layer){
+    if(mutedSet.has(layer.id)) return;
+    if(soloId && soloId !== layer.id) return;
 
-      const step = Math.floor(tick32/div) % S.steps;
-      if(!layer.pattern || !layer.pattern[step]) return;
+    const mult = layer.bpmMult || 1;
+    const div  = Math.max(1, Math.round(2/mult));
+    if(t % div !== 0) return;
 
-      const inst = synthMap[layer.id];
-      if(!inst) return;
-      try{
-        if(inst.isPlayer){ inst.node.stop(time); inst.node.start(time); }
-        else{ inst.node.triggerAttackRelease(layer.note||"C4","16n",time); }
-      }catch(_){}
-    });
+    const step = Math.floor(t/div) % S.steps;
+    if(!layer.pattern || !layer.pattern[step]) return;
 
-    Tone.Draw.schedule(()=>drawHead(tick32), time);
-    tick32++;
-  }, "32n");
+    const inst = synthMap[layer.id];
+    if(!inst) return;
+    try{
+      if(inst.isPlayer){ inst.node.stop(now); inst.node.start(now); }
+      else{ inst.node.triggerAttackRelease(layer.note||"C4","16n",now); }
+    }catch(_){}
+  });
+
+  drawHead(t);
 }
 
 function drawHead(t){
   const beat = getActiveBeat(); if(!beat) return;
-  beat.layers.forEach(layer=>{
+  beat.layers.forEach(function(layer){
     const btns = layerBtns[layer.id]; if(!btns) return;
     const div  = Math.max(1, Math.round(2/(layer.bpmMult||1)));
     if(t % div !== 0) return;
     const step = Math.floor(t/div) % S.steps;
-    btns.forEach((b,i)=>{ i===step ? b.classList.add("hd") : b.classList.remove("hd"); });
+    btns.forEach(function(b,i){ i===step ? b.classList.add("hd") : b.classList.remove("hd"); });
   });
 }
 
@@ -1589,32 +1630,30 @@ function setupSocket(){
   });
 
   socket.on("playUpdate", function(data){
-    var p          = (typeof data === "object") ? data.playing  : data;
-    var startAt    = (typeof data === "object") ? data.startAt  : null;
-    var serverTick = (typeof data === "object") ? data.tick     : 0;
+    var p          = (typeof data === "object") ? data.playing : data;
+    var serverTick = (typeof data === "object") ? (data.tick || 0) : 0;
     playing = p;
     const btn = document.getElementById("play-btn");
     if(p){
+      tick32 = serverTick;
       btn.textContent = "⏸ PAUSE"; btn.classList.add("on");
       if(audioReady){
-        try{
-          // Always reset to tick 0 and position 0 before starting
-          // so all clients begin from the same point in the pattern.
-          tick32 = serverTick || 0;
-          Tone.Transport.stop();
-          Tone.Transport.position = 0;
-          var msUntilStart = startAt ? Math.max(0, startAt - Date.now()) : 0;
-          setTimeout(function(){
-            try{ Tone.Transport.start(); }catch(_){}
-          }, msUntilStart);
-        }catch(_){}
+        try{ Tone.Transport.start(); }catch(_){}
         if(Tone.context.state === "suspended") doUnlockAudio();
       }
     } else {
       tick32 = 0;
-      if(audioReady){ try{ Tone.Transport.stop(); Tone.Transport.position = 0; }catch(_){} }
+      if(audioReady){ try{ Tone.Transport.stop(); }catch(_){} }
       btn.textContent = "▶ PLAY"; btn.classList.remove("on");
+      // Clear playhead
+      Object.values(layerBtns).forEach(function(btns){ btns.forEach(function(b){ b.classList.remove("hd"); }); });
     }
+  });
+
+  // Server tick — fire sequencer step on each tick for tight sync
+  socket.on("tick", function(t){
+    tick32 = t;
+    fireTick(t);
   });
 
   socket.on("bpmUpdate", v=>{
