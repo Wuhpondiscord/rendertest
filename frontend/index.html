@@ -494,7 +494,7 @@
   <div class="ov-bar"><div class="ov-fill" id="ov-fill"></div></div>
   <div id="ov-msg">INITIALIZING...</div>
   <button id="enter-btn" disabled>CONNECTING...</button>
-  <button onclick="window.toggleLog()" style="
+  <button id="ov-log-btn-tmp" style="
     margin-top:18px;
     font-family:'Space Mono',monospace;font-size:8px;letter-spacing:2px;
     background:transparent;color:#35355a;border:1px solid #1e1e36;
@@ -503,15 +503,15 @@
 </div>
 
 <!-- AUDIO UNLOCK BANNER (shown when AudioContext suspended post-enter) -->
-<div id="audio-unlock" onclick="doUnlockAudio()">⚡ TAP HERE TO ACTIVATE AUDIO</div>
+<div id="audio-unlock">⚡ TAP HERE TO ACTIVATE AUDIO</div>
 
 <!-- TOP BAR -->
 <div class="topbar">
   <div class="tbl">
     <span class="proj-name" id="proj-name">Untitled Session</span>
-    <button class="tbtn hi" onclick="window.saveProject()">SAVE</button>
-    <button class="tbtn"    onclick="window.renameProject()">RENAME</button>
-    <select id="proj-loader" onchange="window.loadProject(this.value)">
+    <button class="tbtn hi" id="btn-save">SAVE</button>
+    <button class="tbtn"    id="btn-rename">RENAME</button>
+    <select id="proj-loader">
       <option value="">LOAD PROJECT...</option>
     </select>
   </div>
@@ -525,14 +525,14 @@
     <div id="users">● 0</div>
   </div>
 
-  <button id="rec-btn" class="tt" onclick="window.toggleRecord()">⬤ RECORD</button>
-  <button id="play-btn" class="tt" onclick="window.togglePlay()">▶ PLAY</button>
-  <button class="tt" onclick="window.stopTransport()">■ STOP</button>
-  <button class="tt" onclick="window.clearGrid()">✕ CLEAR</button>
+  <button id="rec-btn"  class="tt">⬤ RECORD</button>
+  <button id="play-btn" class="tt">▶ PLAY</button>
+  <button id="btn-stop" class="tt">■ STOP</button>
+  <button id="btn-clear" class="tt">✕ CLEAR</button>
 
   <div class="ctrl">
     <span class="ctrl-lbl">STEPS</span>
-    <select class="ctrl-sel" id="step-sel" onchange="window.changeSteps(+this.value)">
+    <select class="ctrl-sel" id="step-sel">
       <option value="16">16</option>
       <option value="32">32</option>
       <option value="64">64</option>
@@ -540,20 +540,18 @@
   </div>
   <div class="ctrl">
     <span class="ctrl-lbl">BPM</span>
-    <input type="range" id="bpm-sl" min="40" max="220" value="120" style="width:86px"
-      oninput="window.bpmUI(+this.value)" onchange="window.sendBPM(+this.value)"/>
+    <input type="range" id="bpm-sl" min="40" max="220" value="120" style="width:86px"/>
     <span class="ctrl-val" id="bpm-val">120</span>
   </div>
   <div class="ctrl">
     <span class="ctrl-lbl">REVERB</span>
-    <input type="range" id="reverb-sl" min="0" max="100" value="15" style="width:66px"
-      oninput="window.setReverb(+this.value)"/>
+    <input type="range" id="reverb-sl" min="0" max="100" value="15" style="width:66px"/>
     <span class="ctrl-val" id="reverb-val" style="font-size:9px">15%</span>
   </div>
 
   <div class="t-right">
-    <button class="tt" style="color:var(--ok);border-color:rgba(0,229,160,.3)" onclick="window.exportAudio()">⬇ EXPORT</button>
-    <button id="log-toggle" onclick="window.toggleLog()">LOGS</button>
+    <button id="btn-export" class="tt" style="color:var(--ok);border-color:rgba(0,229,160,.3)">⬇ EXPORT</button>
+    <button id="log-toggle">LOGS</button>
   </div>
 </div>
 
@@ -561,7 +559,7 @@
 <div class="beats-bar">
   <span class="beats-lbl">BEATS</span>
   <div id="beat-tabs" style="display:flex;gap:5px;align-items:center"></div>
-  <button class="beat-add" onclick="window.addBeat()">+ NEW BEAT</button>
+  <button id="btn-add-beat" class="beat-add">+ NEW BEAT</button>
 </div>
 
 <!-- RACK -->
@@ -1721,7 +1719,44 @@ function dlBlob(blob,name){
   setTimeout(()=>URL.revokeObjectURL(url),5000);
 }
 
-// Auto-hide log panel after 15s — user can tap to re-show via log button
+// ═══════════════════════════════════════════════════════════════
+//  WIRE UP STATIC BUTTONS via addEventListener
+//  Inline onclick attributes don't reliably fire in Discord's
+//  WebView — addEventListener on element IDs always works.
+// ═══════════════════════════════════════════════════════════════
+function bindBtn(id, fn){
+  var el = document.getElementById(id);
+  if(el) el.addEventListener("click", fn);
+}
+function bindChange(id, fn){
+  var el = document.getElementById(id);
+  if(el){ el.addEventListener("change", fn); el.addEventListener("input", fn); }
+}
+
+bindBtn("btn-save",     function(){ W.saveProject(); });
+bindBtn("btn-rename",   function(){ W.renameProject(); });
+bindBtn("rec-btn",      function(){ W.toggleRecord(); });
+bindBtn("play-btn",     function(){ W.togglePlay(); });
+bindBtn("btn-stop",     function(){ W.stopTransport(); });
+bindBtn("btn-clear",    function(){ W.clearGrid(); });
+bindBtn("btn-export",   function(){ W.exportAudio(); });
+bindBtn("log-toggle",   function(){ W.toggleLog(); });
+bindBtn("ov-log-btn",   function(){ W.toggleLog(); });
+bindBtn("btn-add-beat", function(){ W.addBeat(); });
+bindBtn("audio-unlock", function(){ doUnlockAudio(); });
+
+bindChange("proj-loader", function(){ W.loadProject(this.value); });
+bindChange("step-sel",    function(){ W.changeSteps(+this.value); });
+
+var bpmSl = document.getElementById("bpm-sl");
+if(bpmSl){
+  bpmSl.addEventListener("input",  function(){ W.bpmUI(+this.value); });
+  bpmSl.addEventListener("change", function(){ W.sendBPM(+this.value); });
+}
+var revSl = document.getElementById("reverb-sl");
+if(revSl) revSl.addEventListener("input", function(){ W.setReverb(+this.value); });
+
+// Auto-hide log panel after 15s
 setTimeout(function(){
   var p = document.getElementById("log-panel");
   if(p) p.classList.add("hidden");
@@ -1735,8 +1770,8 @@ boot();
 <div id="log-panel" onclick="this.classList.add('hidden')">
   <div id="log-toolbar">
     <span>DEBUG CONSOLE — TAP TO HIDE</span>
-    <button id="log-copy"  onclick="event.stopPropagation();W.copyLogs()">⧉ COPY ALL</button>
-    <button id="log-clear" onclick="event.stopPropagation();W.clearLogs()">✕ CLEAR</button>
+    <button id="log-copy"  >⧉ COPY ALL</button>
+    <button id="log-clear" >✕ CLEAR</button>
   </div>
   <div id="log-entries" onclick="event.stopPropagation()"></div>
 </div>
