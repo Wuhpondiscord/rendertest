@@ -312,14 +312,36 @@ io.on("connection", (socket) => {
     const v = Math.max(40, Math.min(220, Number(bpm) || 120));
     STATE.bpm = v;
     io.emit("bpmUpdate", v);
+    // Restart tick timer at new BPM if playing
+    if(STATE._tickTimer){
+      clearInterval(STATE._tickTimer);
+      const ms32n = (60000 / v) / 8;
+      STATE._tickTimer = setInterval(()=>{
+        STATE.tick = (STATE.tick || 0) + 1;
+        io.emit("tick", STATE.tick);
+      }, ms32n);
+    }
   });
 
   socket.on("togglePlay", (p) => {
     STATE.isPlaying = !!p;
-    const startAt = p ? Date.now() + 300 : null;
-    io.emit("playUpdate", { playing: STATE.isPlaying, startAt, tick: STATE.tick || 0 });
-    if(p) STATE.tick = (STATE.tick || 0); // keep ticking via client
-    else  STATE.tick = 0;
+    if(!p){
+      // Stop: clear timer, reset tick
+      clearInterval(STATE._tickTimer);
+      STATE._tickTimer = null;
+      STATE.tick = 0;
+      io.emit("playUpdate", { playing: false, tick: 0 });
+    } else {
+      // Play: start server-driven tick broadcast
+      // All clients fire their sequencer step on each "tick" event
+      STATE.tick = 0;
+      const ms32n = (60000 / STATE.bpm) / 8;
+      STATE._tickTimer = setInterval(()=>{
+        STATE.tick++;
+        io.emit("tick", STATE.tick);
+      }, ms32n);
+      io.emit("playUpdate", { playing: true, tick: 0 });
+    }
   });
 
   socket.on("changeSteps", (n) => {
