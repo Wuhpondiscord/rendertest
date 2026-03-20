@@ -494,7 +494,7 @@
   <div class="ov-bar"><div class="ov-fill" id="ov-fill"></div></div>
   <div id="ov-msg">INITIALIZING...</div>
   <button id="enter-btn" disabled>CONNECTING...</button>
-  <button onclick="W.toggleLog()" style="
+  <button onclick="window.toggleLog()" style="
     margin-top:18px;
     font-family:'Space Mono',monospace;font-size:8px;letter-spacing:2px;
     background:transparent;color:#35355a;border:1px solid #1e1e36;
@@ -509,9 +509,9 @@
 <div class="topbar">
   <div class="tbl">
     <span class="proj-name" id="proj-name">Untitled Session</span>
-    <button class="tbtn hi" onclick="W.saveProject()">SAVE</button>
-    <button class="tbtn"    onclick="W.renameProject()">RENAME</button>
-    <select id="proj-loader" onchange="W.loadProject(this.value)">
+    <button class="tbtn hi" onclick="window.saveProject()">SAVE</button>
+    <button class="tbtn"    onclick="window.renameProject()">RENAME</button>
+    <select id="proj-loader" onchange="window.loadProject(this.value)">
       <option value="">LOAD PROJECT...</option>
     </select>
   </div>
@@ -525,14 +525,14 @@
     <div id="users">● 0</div>
   </div>
 
-  <button id="rec-btn" class="tt" onclick="W.toggleRecord()">⬤ RECORD</button>
-  <button id="play-btn" class="tt" onclick="W.togglePlay()">▶ PLAY</button>
-  <button class="tt" onclick="W.stopTransport()">■ STOP</button>
-  <button class="tt" onclick="W.clearGrid()">✕ CLEAR</button>
+  <button id="rec-btn" class="tt" onclick="window.toggleRecord()">⬤ RECORD</button>
+  <button id="play-btn" class="tt" onclick="window.togglePlay()">▶ PLAY</button>
+  <button class="tt" onclick="window.stopTransport()">■ STOP</button>
+  <button class="tt" onclick="window.clearGrid()">✕ CLEAR</button>
 
   <div class="ctrl">
     <span class="ctrl-lbl">STEPS</span>
-    <select class="ctrl-sel" id="step-sel" onchange="W.changeSteps(+this.value)">
+    <select class="ctrl-sel" id="step-sel" onchange="window.changeSteps(+this.value)">
       <option value="16">16</option>
       <option value="32">32</option>
       <option value="64">64</option>
@@ -541,19 +541,19 @@
   <div class="ctrl">
     <span class="ctrl-lbl">BPM</span>
     <input type="range" id="bpm-sl" min="40" max="220" value="120" style="width:86px"
-      oninput="W.bpmUI(+this.value)" onchange="W.sendBPM(+this.value)"/>
+      oninput="window.bpmUI(+this.value)" onchange="window.sendBPM(+this.value)"/>
     <span class="ctrl-val" id="bpm-val">120</span>
   </div>
   <div class="ctrl">
     <span class="ctrl-lbl">REVERB</span>
     <input type="range" id="reverb-sl" min="0" max="100" value="15" style="width:66px"
-      oninput="W.setReverb(+this.value)"/>
+      oninput="window.setReverb(+this.value)"/>
     <span class="ctrl-val" id="reverb-val" style="font-size:9px">15%</span>
   </div>
 
   <div class="t-right">
-    <button class="tt" style="color:var(--ok);border-color:rgba(0,229,160,.3)" onclick="W.exportAudio()">⬇ EXPORT</button>
-    <button id="log-toggle" onclick="W.toggleLog()">LOGS</button>
+    <button class="tt" style="color:var(--ok);border-color:rgba(0,229,160,.3)" onclick="window.exportAudio()">⬇ EXPORT</button>
+    <button id="log-toggle" onclick="window.toggleLog()">LOGS</button>
   </div>
 </div>
 
@@ -561,7 +561,7 @@
 <div class="beats-bar">
   <span class="beats-lbl">BEATS</span>
   <div id="beat-tabs" style="display:flex;gap:5px;align-items:center"></div>
-  <button class="beat-add" onclick="W.addBeat()">+ NEW BEAT</button>
+  <button class="beat-add" onclick="window.addBeat()">+ NEW BEAT</button>
 </div>
 
 <!-- RACK -->
@@ -602,7 +602,10 @@ const API_BASE        = "/api";
 const SOCKET_PATH     = "/api/socketio";
 const SOCKETIO_SCRIPT = "/api/socketio/socket.io.js";
 
-const W = window;
+// All functions assigned to window directly — true globals accessible from
+// inline onclick="..." attributes in Discord's strict WebView environment.
+// (Script-scoped const/var are NOT visible to inline event handlers in Discord.)
+var W = window; // keep W as alias for internal use
 
 // ═══════════════════════════════════════════════════════════════
 //  IN-PAGE LOGGER — runs first, catches everything
