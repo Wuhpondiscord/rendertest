@@ -1249,7 +1249,9 @@ function fireTick(t){
     }catch(_){}
   });
 
-  drawHead(t);
+  // Draw head one step ahead so the highlight is centered on the button
+  // when the audio fires (accounts for audio output latency)
+  drawHead(t + 1);
 }
 
 function drawHead(t){
@@ -1257,7 +1259,6 @@ function drawHead(t){
   beat.layers.forEach(function(layer){
     const btns = layerBtns[layer.id]; if(!btns) return;
     const div  = Math.max(1, Math.round(2/(layer.bpmMult||1)));
-    if(t % div !== 0) return;
     const step = Math.floor(t/div) % S.steps;
     btns.forEach(function(b,i){ i===step ? b.classList.add("hd") : b.classList.remove("hd"); });
   });
@@ -1800,13 +1801,22 @@ bindBtn("ov-log-btn",   function(){ W.toggleLog(); });
 bindBtn("btn-add-beat", function(){ W.addBeat(); });
 bindBtn("audio-unlock", function(){ doUnlockAudio(); });
 
-bindChange("proj-loader", function(){ W.loadProject(this.value); });
+// Debounce helper — only fires fn after user stops for `delay` ms
+function debounce(fn, delay){
+  var t; return function(){ var a=arguments, ctx=this; clearTimeout(t); t=setTimeout(function(){ fn.apply(ctx,a); }, delay); };
+}
+
+bindChange("proj-loader", function(){ if(this.value) W.loadProject(this.value); });
 bindChange("step-sel",    function(){ W.changeSteps(+this.value); });
 
 var bpmSl = document.getElementById("bpm-sl");
 if(bpmSl){
-  bpmSl.addEventListener("input",  function(){ W.bpmUI(+this.value); });
-  bpmSl.addEventListener("change", function(){ W.sendBPM(+this.value); });
+  var sendBPMDebounced = debounce(function(v){ W.sendBPM(v); }, 300);
+  bpmSl.addEventListener("input", function(){
+    var v = +this.value;
+    W.bpmUI(v);           // update display immediately
+    sendBPMDebounced(v);  // send to server 300ms after last move
+  });
 }
 var revSl = document.getElementById("reverb-sl");
 if(revSl) revSl.addEventListener("input", function(){ W.setReverb(+this.value); });
