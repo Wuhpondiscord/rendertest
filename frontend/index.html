@@ -1116,61 +1116,66 @@ setTimeout(function(){
 //  5. Start sequencer loop + build UI.
 // ═══════════════════════════════════════════════════════════════
 async function enterStudio(){
-  // ★ Step 1 — hide overlay immediately, never block on audio ★
-  document.getElementById("overlay").style.display = "none";
+  // ★ ALWAYS hide overlay first — before anything that could throw ★
+  var overlay = document.getElementById("overlay");
+  if(overlay) overlay.style.display = "none";
 
-  // Step 2 — user display
-  const col = userColor(username);
-  document.getElementById("user-disp").textContent = "● " + username;
-  document.getElementById("user-disp").style.color = col;
-
-  // Step 3 — try to start AudioContext from this gesture
   try{
-    await Promise.race([
-      Tone.start(),
-      new Promise(r=>setTimeout(r, 2500))
-    ]);
-  }catch(e){ console.warn("Tone.start:", e); }
+    // Step 2 — user display
+    var col = userColor(username);
+    document.getElementById("user-disp").textContent = "● " + username;
+    document.getElementById("user-disp").style.color = col;
+  }catch(e){ console.warn("user display err:", e.message); }
 
-  // Step 4 — build master graph
-  masterComp = new Tone.Compressor({ threshold:-18, ratio:4, attack:.003, release:.25 });
-  masterOut  = new Tone.Gain(0.82).toDestination();
-  masterComp.connect(masterOut);
+  // Step 3 — start AudioContext (requires user gesture)
+  if(typeof Tone === "undefined"){
+    console.warn("Tone.js not loaded — audio disabled");
+    audioReady = false;
+  } else {
+    try{
+      await Promise.race([
+        Tone.start(),
+        new Promise(function(r){ setTimeout(r, 2500); })
+      ]);
+      console.log("Tone started, context:", Tone.context.state);
+    }catch(e){ console.warn("Tone.start:", e.message); }
 
-  recorder = new Tone.Recorder();
-  masterOut.connect(recorder);
+    // Step 4 — build master audio graph
+    try{
+      masterComp = new Tone.Compressor({ threshold:-18, ratio:4, attack:.003, release:.25 });
+      masterOut  = new Tone.Gain(0.82).toDestination();
+      masterComp.connect(masterOut);
+      recorder   = new Tone.Recorder();
+      masterOut.connect(recorder);
+    }catch(e){ console.warn("Master graph err:", e.message); }
 
-  // Reverb with fallback — create it, connect optimistically.
-  // DO NOT await generate() — it uses OfflineAudioContext which hangs in Discord iframes.
-  try{
-    const verbCandidate = new Tone.Reverb({ decay:2.2, wet:0.15 });
-    // Race: if connected in time, use it; otherwise keep dry path
-    await Promise.race([
-      new Promise(res=>{
+    // Reverb — skip if AudioContext still suspended (common in Discord)
+    try{
+      if(Tone.context.state !== "suspended"){
+        var verbCandidate = new Tone.Reverb({ decay:2.2, wet:0.15 });
         verbCandidate.connect(masterComp);
         masterVerb = verbCandidate;
-        res();
-      }),
-      new Promise(res=>setTimeout(res, 1500))
-    ]);
-  }catch(e){
-    console.warn("Reverb init failed, dry path:", e);
-    masterVerb = null;
+      }
+    }catch(e){
+      console.warn("Reverb init failed, dry path:", e.message);
+      masterVerb = null;
+    }
+
+    audioReady = true;
+    console.log("audioReady = true");
+
+    // Step 5 — audio unlock banner
+    try{
+      if(Tone.context.state === "suspended"){
+        document.getElementById("audio-unlock").style.display = "block";
+        document.addEventListener("click",      function(){ doUnlockAudio(); }, { once:true });
+        document.addEventListener("touchstart", function(){ doUnlockAudio(); }, { once:true });
+      }
+    }catch(e){}
   }
 
-  audioReady = true;
-
-  // Step 5 — show audio unlock banner if AudioContext is still suspended
-  if(Tone.context.state === "suspended"){
-    document.getElementById("audio-unlock").style.display = "block";
-    // Any subsequent user interaction will also try to unlock
-    const tryUnlock = ()=>doUnlockAudio();
-    document.addEventListener("click",      tryUnlock, { once:true });
-    document.addEventListener("touchstart", tryUnlock, { once:true });
-  }
-
-  startLoop();
-  buildUI();
+  try{ startLoop(); }catch(e){ console.warn("startLoop err:", e.message); }
+  try{ buildUI();   }catch(e){ console.warn("buildUI err:",   e.message); }
 }
 
 // ═══════════════════════════════════════════════════════════════
