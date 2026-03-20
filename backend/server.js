@@ -316,7 +316,10 @@ io.on("connection", (socket) => {
 
   socket.on("togglePlay", (p) => {
     STATE.isPlaying = !!p;
-    io.emit("playUpdate", STATE.isPlaying);
+    const startAt = p ? Date.now() + 300 : null;
+    io.emit("playUpdate", { playing: STATE.isPlaying, startAt, tick: STATE.tick || 0 });
+    if(p) STATE.tick = (STATE.tick || 0); // keep ticking via client
+    else  STATE.tick = 0;
   });
 
   socket.on("changeSteps", (n) => {
