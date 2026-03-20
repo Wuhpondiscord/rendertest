@@ -1588,15 +1588,31 @@ function setupSocket(){
     else if(audioReady) buildUI(); // inst/note/label changes need a full rebuild
   });
 
-  socket.on("playUpdate", p=>{
+  socket.on("playUpdate", function(data){
+    var p          = (typeof data === "object") ? data.playing  : data;
+    var startAt    = (typeof data === "object") ? data.startAt  : null;
+    var serverTick = (typeof data === "object") ? data.tick     : 0;
     playing = p;
     const btn = document.getElementById("play-btn");
     if(p){
-      if(audioReady){ try{ Tone.Transport.start(); }catch(_){} }
       btn.textContent = "⏸ PAUSE"; btn.classList.add("on");
-      if(audioReady && Tone.context.state === "suspended") doUnlockAudio();
+      if(audioReady){
+        try{
+          // Always reset to tick 0 and position 0 before starting
+          // so all clients begin from the same point in the pattern.
+          tick32 = serverTick || 0;
+          Tone.Transport.stop();
+          Tone.Transport.position = 0;
+          var msUntilStart = startAt ? Math.max(0, startAt - Date.now()) : 0;
+          setTimeout(function(){
+            try{ Tone.Transport.start(); }catch(_){}
+          }, msUntilStart);
+        }catch(_){}
+        if(Tone.context.state === "suspended") doUnlockAudio();
+      }
     } else {
-      if(audioReady){ try{ Tone.Transport.pause(); }catch(_){} }
+      tick32 = 0;
+      if(audioReady){ try{ Tone.Transport.stop(); Tone.Transport.position = 0; }catch(_){} }
       btn.textContent = "▶ PLAY"; btn.classList.remove("on");
     }
   });
